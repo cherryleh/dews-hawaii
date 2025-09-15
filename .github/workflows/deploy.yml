@@ -20,7 +20,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd dews-hawaii
+          cd dews-hawaii-app
           npm install
 
       - name: Build Angular app
