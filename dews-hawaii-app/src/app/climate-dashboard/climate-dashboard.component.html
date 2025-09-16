@@ -35,23 +35,49 @@
             </defs>
             <rect x="0" y="0" width="560" height="320" fill="url(#grid)" />
 
-            <g *ngFor="let isle of islands(); trackBy: trackByIsle">
+            <g *ngFor="let feature of islands(); trackBy: trackByIsle">
               <path
-                class="island"
-                [attr.d]="pathById()[isle.id]"
-                [attr.fill]="selectedIsland()?.id === isle.id ? 'var(--primary)' : '#e5e7eb'"
-                [attr.stroke]="selectedIsland()?.id === isle.id ? 'var(--ring)' : '#9ca3af'"
-                [attr.stroke-width]="selectedIsland()?.id === isle.id ? 2 : 1"
-                [attr.filter]="selectedIsland()?.id === isle.id ? 'url(#glow)' : null"
-                (click)="pickIsland(isle)">
+                [attr.d]="pathById()[feature.id]"
+                [attr.fill]="
+                  viewMode() === 'divisions' && selectedDivision() === feature.name
+                    ? 'var(--primary)'
+                    : hoveredFeature() === feature.name
+                      ? '#cbd5e1'
+                      : '#e5e7eb'
+                "
+                [attr.stroke]="
+                  viewMode() === 'divisions' && selectedDivision() === feature.name
+                    ? 'var(--ring)'
+                    : hoveredFeature() === feature.name
+                      ? '#6b7280'
+                      : '#9ca3af'
+                "
+                [attr.stroke-width]="
+                  viewMode() === 'divisions' && selectedDivision() === feature.name
+                    ? 2
+                    : hoveredFeature() === feature.name
+                      ? 2
+                      : 1
+                "
+                [attr.filter]="
+                  viewMode() === 'divisions' && selectedDivision() === feature.name
+                    ? 'url(#glow)'
+                    : null
+                "
+                (mouseover)="hoveredFeature.set(feature.name)"
+                (mouseout)="hoveredFeature.set(null)"
+                (click)="viewMode() === 'islands' ? pickIsland(feature) : pickDivision(feature.name)">
               </path>
 
-              <ng-container *ngIf="centroidById()[isle.id] as c">
+
+              <ng-container *ngIf="centroidById()[feature.id] as c">
                 <text [attr.x]="c[0]" [attr.y]="c[1] + 12" text-anchor="middle" class="island-label">
-                  {{ isle.short }}
+                  {{ feature.short }}
                 </text>
               </ng-container>
             </g>
+
+
 
           </svg>
           <div *ngIf="!selectedIsland()" class="hint">Tip: Replace with real outlines or Leaflet.</div>
@@ -88,19 +114,6 @@
               <span class="chip chip-county">{{ sd }}</span>
             </ng-container>
           </ng-container>
-        </div>
-
-        <div class="mt">
-          <div class="subhead">Choose a division</div>
-          <div *ngIf="!selectedIsland()" class="muted">Pick an island on the map first.</div>
-          <div *ngIf="selectedIsland() as si" class="chips">
-            <button *ngFor="let d of si.divisions; trackBy: trackByDivision"
-                    class="chip chip-option"
-                    [class.chip-selected]="selectedDivision() === d"
-                    (click)="pickDivision(d)">
-              {{ d }}
-            </button>
-          </div>
         </div>
 
         <div class="mt">
