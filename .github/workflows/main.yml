@@ -2,39 +2,34 @@ name: Deploy Angular to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
-
-permissions:
-  contents: write   # needed to push to gh-pages
+    branches:
+      - main  # or 'master' if you're using that
 
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js (with cache for subfolder)
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: dews-hawaii-app/package-lock.json
+          node-version: '18'
 
       - name: Install dependencies
-        working-directory: dews-hawaii-app
-        run: npm ci
-
-      - name: Build Angular app (prod) with correct base href
-        working-directory: dews-hawaii-app
-        run: npx ng build --configuration=production --base-href="/dews-hawaii/"
-
-      - name: Create 404.html for SPA routing fallback
         run: |
-          node -e "import fs from 'fs'; const p='dews-hawaii-app/dist/dews-hawaii-app/browser/index.html'; fs.copyFileSync(p, 'dews-hawaii-app/dist/dews-hawaii-app/browser/404.html');"
+          cd dews-hawaii-app
+          npm install
 
-      - name: Deploy to GitHub Pages (gh-pages branch)
+      - name: Build Angular app
+        run: |
+          cd panaewa-app
+          npm run build -- --configuration production
+
+      - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
-          folder: dews-hawaii-app/dist/dews-hawaii-app/browser
+          folder: dews-hawaii-app/dist/dews-hawaii-app/browser  
