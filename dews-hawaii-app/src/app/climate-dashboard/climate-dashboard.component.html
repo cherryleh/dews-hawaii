@@ -35,17 +35,24 @@
             </defs>
             <rect x="0" y="0" width="560" height="320" fill="url(#grid)" />
 
-              <g *ngFor="let isle of islands; trackBy: trackByIsle" 
-               [attr.transform]="'translate(' + isle.cx + ',' + isle.cy + ')'">
-              <circle class="island"
-                [attr.r]="isle.r"
-                [attr.fill]="selectedIsland()?.id === isle.id ? 'var(--primary)' : '#d1d5db'"
+            <g *ngFor="let isle of islands(); trackBy: trackByIsle">
+              <path
+                class="island"
+                [attr.d]="pathById()[isle.id]"
+                [attr.fill]="selectedIsland()?.id === isle.id ? 'var(--primary)' : '#e5e7eb'"
                 [attr.stroke]="selectedIsland()?.id === isle.id ? 'var(--ring)' : '#9ca3af'"
-                [attr.stroke-width]="selectedIsland()?.id === isle.id ? 3 : 1"
+                [attr.stroke-width]="selectedIsland()?.id === isle.id ? 2 : 1"
                 [attr.filter]="selectedIsland()?.id === isle.id ? 'url(#glow)' : null"
-                (click)="pickIsland(isle)" />
-              <text [attr.y]="isle.r + 16" text-anchor="middle" class="island-label">{{ isle.short }}</text>
+                (click)="pickIsland(isle)">
+              </path>
+
+              <ng-container *ngIf="centroidById()[isle.id] as c">
+                <text [attr.x]="c[0]" [attr.y]="c[1] + 12" text-anchor="middle" class="island-label">
+                  {{ isle.short }}
+                </text>
+              </ng-container>
             </g>
+
           </svg>
           <div *ngIf="!selectedIsland()" class="hint">Tip: Replace with real outlines or Leaflet.</div>
         </div>

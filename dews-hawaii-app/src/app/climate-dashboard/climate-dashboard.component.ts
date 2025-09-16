@@ -1,35 +1,44 @@
 import { Component, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { geoIdentity, geoPath } from 'd3-geo';
+
+
+
 import { StatBoxComponent } from '../stat-box/stat-box.component';
 import { TrendChartComponent } from '../trend-chart/trend-chart.component';
 
 interface Island {
-  id: string; name: string; short: string; cx: number; cy: number; r: number; divisions: string[];
+  id: string;
+  name: string;
+  short: string;
+  divisions: string[];
+  feature: any;
 }
 
-const ISLANDS: Island[] = [
-  { id: 'niihau', name: 'Niʻihau', short: 'Niʻihau', cx: 120, cy: 90, r: 10, divisions: ['West Niʻihau', 'East Niʻihau'] },
-  { id: 'kauai', name: 'Kauaʻi', short: 'Kauaʻi', cx: 150, cy: 110, r: 20, divisions: ['North Kauaʻi', 'South Kauaʻi'] },
-  { id: 'oahu', name: 'Oʻahu', short: 'Oʻahu', cx: 250, cy: 140, r: 18, divisions: ['Windward Oʻahu', 'Leeward Oʻahu', 'Honolulu'] },
-  { id: 'molokai', name: 'Molokaʻi', short: 'Molokaʻi', cx: 320, cy: 155, r: 16, divisions: ['West Molokaʻi', 'East Molokaʻi'] },
-  { id: 'lanai', name: 'Lānaʻi', short: 'Lānaʻi', cx: 335, cy: 185, r: 12, divisions: ['Central Lānaʻi'] },
-  { id: 'maui', name: 'Maui', short: 'Maui', cx: 355, cy: 165, r: 26, divisions: ['West Maui', 'Central Maui', 'East Maui'] },
-  { id: 'kahoolawe', name: 'Kahoʻolawe', short: 'Kahoʻolawe', cx: 355, cy: 205, r: 10, divisions: ['Kahoʻolawe'] },
-  { id: 'hawaii', name: 'Hawaiʻi (Island of Hawaiʻi)', short: 'Hawaiʻi', cx: 460, cy: 230, r: 40, divisions: ['Hawaiʻi Mauka', 'Windward Kohala', 'Kaʻu', 'Hilo', 'Leeward Kohala', 'Kona'] },
-];
+const DIVISIONS: Record<string, string[]> = {
+  'Kauaʻi': ['North Kauaʻi', 'South Kauaʻi'],
+  'Oʻahu': ['Windward Oʻahu', 'Leeward Oʻahu', 'Honolulu'],
+  'Molokaʻi': ['West Molokaʻi', 'East Molokaʻi'],
+  'Lānaʻi': ['Central Lānaʻi'],
+  'Maui': ['West Maui', 'Central Maui', 'East Maui'],
+  'Kahoʻolawe': ['Kahoʻolawe'],
+  'Hawaiʻi': ['Hawaiʻi Mauka', 'Windward Kohala', 'Kaʻu', 'Hilo', 'Leeward Kohala', 'Kona'],
+};
 
-@Component({
-  selector: 'app-climate-dashboard',
-  standalone: true,
-  imports: [CommonModule, FormsModule, StatBoxComponent, TrendChartComponent],
-  templateUrl: './climate-dashboard.component.html',
-  styleUrls: ['./climate-dashboard.component.css']
-})
+  @Component({
+    selector: 'app-climate-dashboard',
+    standalone: true,
+    imports: [CommonModule, FormsModule, HttpClientModule, StatBoxComponent, TrendChartComponent],
+    templateUrl: './climate-dashboard.component.html',
+    styleUrls: ['./climate-dashboard.component.css']
+  })
 export class ClimateDashboardComponent {
-  // Theme (CSS vars are set in component CSS)
-  islands = ISLANDS;
-
+  constructor(private http: HttpClient) {}
+  islands = signal<Island[]>([]);
+  pathById = signal<Record<string, string>>({});
+  centroidById = signal<Record<string, [number, number]>>({});
   trackByIsle = (_: number, isle: { id: string | number }) => isle.id;
   trackByDivision = (_: number, d: string) => d;
 
@@ -41,7 +50,48 @@ export class ClimateDashboardComponent {
 
   unit = computed(() => this.selectedDataset() === 'Rainfall' ? 'in' : '°F');
 
-  // Mock 12-month series, varies by selection
+  ngOnInit() {
+    this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
+      const projection = geoIdentity()
+        .reflectY(true)         // flip Y so north is up
+        .fitSize([560, 320], fc);
+
+      const path = geoPath(projection as any);
+
+      console.log(fc.features[0].properties);
+
+
+      const features = fc.features.map((f: any) => {
+        const name = f.properties?.isle 
+                   || f.properties?.island 
+                   || f.properties?.name 
+                   || 'Unknown';
+
+        const id = name.toLowerCase().replace(/\s+/g, '-');
+        return <Island>{
+          id,
+          name,
+          short: name,
+          divisions: DIVISIONS[name] || [],
+          feature: f
+        };
+      });
+
+
+      const pathById: Record<string, string> = {};
+      const centroidById: Record<string, [number, number]> = {};
+      for (const is of features) {
+        pathById[is.id] = path(is.feature)!;
+        centroidById[is.id] = path.centroid(is.feature) as [number, number];
+      }
+
+      this.islands.set(features);
+      this.pathById.set(pathById);
+      this.centroidById.set(centroidById);
+    });
+  }
+
+
   tsData = computed(() => {
     const now = new Date();
     const seedStr = `${this.selectedIsland()?.id || 'state'}|${this.selectedDivision() || 'state'}|${this.selectedDataset()}`;
