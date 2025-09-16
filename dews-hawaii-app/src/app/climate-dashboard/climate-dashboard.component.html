@@ -1,0 +1,182 @@
+<div class="page">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">HI</div>
+      <h1>Hawaii Climate Explorer</h1>
+    </div>
+    <div class="note">Mock UI • Replace with live data later</div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT COLUMN: Map + Trend stacked to match sidebar height -->
+    <div class="left-col">
+      <!-- Map Panel -->
+      <section class="panel panel-grow">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Map</div>
+            <div class="title">Click an island to explore</div>
+          </div>
+          <button *ngIf="selectedIsland()" class="btn" (click)="reset()">Reset</button>
+        </div>
+        <div class="map">
+          <svg viewBox="0 0 560 320" class="map-svg" role="img" aria-label="Hawaiʻi islands (abstract)">
+            <defs>
+              <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+                <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="1" />
+              </pattern>
+            </defs>
+            <rect x="0" y="0" width="560" height="320" fill="url(#grid)" />
+
+              <g *ngFor="let isle of islands; trackBy: trackByIsle" 
+               [attr.transform]="'translate(' + isle.cx + ',' + isle.cy + ')'">
+              <circle class="island"
+                [attr.r]="isle.r"
+                [attr.fill]="selectedIsland()?.id === isle.id ? 'var(--primary)' : '#d1d5db'"
+                [attr.stroke]="selectedIsland()?.id === isle.id ? 'var(--ring)' : '#9ca3af'"
+                [attr.stroke-width]="selectedIsland()?.id === isle.id ? 3 : 1"
+                [attr.filter]="selectedIsland()?.id === isle.id ? 'url(#glow)' : null"
+                (click)="pickIsland(isle)" />
+              <text [attr.y]="isle.r + 16" text-anchor="middle" class="island-label">{{ isle.short }}</text>
+            </g>
+          </svg>
+          <div *ngIf="!selectedIsland()" class="hint">Tip: Replace with real outlines or Leaflet.</div>
+        </div>
+      </section>
+
+      <!-- Trend Panel -->
+      <section class="panel panel-grow">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Trend</div>
+            <div class="title">{{ selectedDataset() }} — last 12 months</div>
+          </div>
+          <div class="tiny">{{ selectedDivision() || selectedIsland()?.short || 'Statewide' }}</div>
+        </div>
+        <div class="chart-wrap">
+          <app-trend-chart [data]="tsData()" [unit]="unit()"></app-trend-chart>
+        </div>
+        <div class="tiny muted">Mock values for illustration.</div>
+      </section>
+    </div>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside class="aside">
+      <div class="panel">
+        <div class="eyebrow">Selection</div>
+        <div class="crumbs">
+          <span class="chip">Statewide</span>
+          <ng-container *ngIf="selectedIsland() as si">
+            <span class="sep">›</span>
+            <button class="chip chip-active" (click)="selectedDivision.set(null)">{{ si.short }}</button>
+            <ng-container *ngIf="selectedDivision() as sd">
+              <span class="sep">›</span>
+              <span class="chip chip-county">{{ sd }}</span>
+            </ng-container>
+          </ng-container>
+        </div>
+
+        <div class="mt">
+          <div class="subhead">Choose a division</div>
+          <div *ngIf="!selectedIsland()" class="muted">Pick an island on the map first.</div>
+          <div *ngIf="selectedIsland() as si" class="chips">
+            <button *ngFor="let d of si.divisions; trackBy: trackByDivision"
+                    class="chip chip-option"
+                    [class.chip-selected]="selectedDivision() === d"
+                    (click)="pickDivision(d)">
+              {{ d }}
+            </button>
+          </div>
+        </div>
+
+        <div class="mt">
+          <div class="subhead">Choose a dataset</div>
+          <div class="chips">
+            <button class="chip chip-option" [class.chip-selected]="selectedDataset() === 'Rainfall'" (click)="pickDataset('Rainfall')">Rainfall</button>
+            <button class="chip chip-option" [class.chip-selected]="selectedDataset() === 'Temperature'" (click)="pickDataset('Temperature')">Temperature</button>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn" (click)="reset()">Clear</button>
+          <button class="btn btn-primary" [disabled]="!selectedIsland()" (click)="subscribe()">View details</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Climate snapshot</div>
+            <div class="title">{{ selectedDataset() }} – {{ selectedDivision() || selectedIsland()?.short || 'Statewide' }} • {{ selectedTimescale() }}-month</div>
+          </div>
+          <div class="tiny muted">Updated just now</div>
+        </div>
+
+        <!-- Only show selected dataset; each stat in its own box -->
+        <div *ngIf="selectedDataset() === 'Rainfall'; else tempStats" class="stats">
+          <app-stat-box label="RF" value="1.97 in"></app-stat-box>
+          <app-stat-box label="Anomaly" value="-3.20 in"></app-stat-box>
+          <app-stat-box label="Rank" value="Driest"></app-stat-box>
+        </div>
+        <ng-template #tempStats>
+          <div class="stats">
+            <app-stat-box label="Temp" value="70.0 °F"></app-stat-box>
+            <app-stat-box label="Anomaly" value="0.6 °F"></app-stat-box>
+            <app-stat-box label="Rank" value="9th Warmest"></app-stat-box>
+          </div>
+        </ng-template>
+
+        <!-- Timescale slider 1..12 with bubble -->
+        <div class="mt">
+          <div class="eyebrow">Time scale</div>
+          <div class="slider-wrap">
+            <input type="range" min="1" max="12" step="1" [ngModel]="selectedTimescale()" (ngModelChange)="setTimescale($event)"/>
+            <div class="bubble" [ngStyle]="{ left: ((selectedTimescale() - 1) / 11 * 100) + '%' }">{{ selectedTimescale() }} mo</div>
+            <div class="slider-ends"><span>1 mo</span><span>12 mo</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="eyebrow">Monthly email reports</div>
+        <div class="muted">Get a monthly report for your current selection.</div>
+
+        <div class="mt">
+          <div class="summary">
+            <div class="muted">Selection</div>
+            <div class="strong">{{ selectedDataset() }} — {{ selectedDivision() || selectedIsland()?.short || 'Statewide' }} • {{ selectedTimescale() }}-month</div>
+          </div>
+        </div>
+
+        <label class="label" for="email">Email address</label>
+        <input
+          id="email"
+          class="input"
+          type="email"
+          [ngModel]="email()"
+          (ngModelChange)="email.set($event)"
+          placeholder="you@example.com"
+        />
+
+        <div class="tiny error" *ngIf="email() && !isEmailValid()">
+          Please enter a valid email.
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-primary" [disabled]="!isEmailValid()" (click)="subscribe()">
+            Subscribe
+          </button>
+          <button class="btn" (click)="email.set('')">Clear</button>
+        </div>
+        <div class="tiny muted">We’ll send a report around the 1st of each month. You can unsubscribe anytime.</div>
+      </div>
+    </aside>
+  </div>
+</div>

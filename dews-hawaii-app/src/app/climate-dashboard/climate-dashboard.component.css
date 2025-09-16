@@ -1,0 +1,73 @@
+:host {
+  --bg: #f9fafb; --panel:#fff; --card:#f3f4f6; --primary:#0ea5e9; --ring:#0284c7;
+  --text:#111827; --sub:#4b5563; --border:#e5e7eb;
+  display: block;
+}
+.page { min-height: 100vh; background: var(--bg); color: var(--text); }
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border); }
+.brand { display:flex; align-items:center; gap:12px; }
+.brand-badge { width:36px; height:36px; border-radius:12px; background:#cffafe; border:1px solid #a5f3fc; display:flex; align-items:center; justify-content:center; font-weight:700; color:#0891b2; }
+.note { font-size:13px; color: var(--sub); }
+
+.grid { display:grid; grid-template-columns: 1fr; gap:24px; padding:24px; }
+@media (min-width:1024px) { .grid { grid-template-columns: 7fr 5fr; } }
+@media (min-width:1280px) { .grid { grid-template-columns: 8fr 4fr; } }
+
+.left-col { display:flex; flex-direction:column; gap:24px; }
+.aside { display:flex; flex-direction:column; gap:24px; }
+
+.panel { background: var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+.panel-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.eyebrow { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--sub); }
+.title { font-weight:600; }
+.tiny { font-size:12px; }
+.muted { color: var(--sub); }
+.strong { font-weight:600; }
+.mt { margin-top:10px; }
+.actions { display:flex; gap:8px; margin-top:12px; }
+.btn { border:1px solid var(--border); background:#fff; border-radius:12px; padding:8px 12px; font-size:14px; }
+.btn:hover { background:#f9fafb; }
+.btn-primary { background:#e0f2fe; border-color:#bae6fd; }
+.btn-primary:hover { background:#bae6fd; }
+.btn[disabled] { opacity:.6; cursor:not-allowed; }
+
+/* Map */
+.map { position:relative; border:1px solid var(--border); background:#f3f4f6; border-radius:12px; overflow:hidden; flex:1 1 auto; min-height: 260px; }
+.map-svg { width:100%; height:100%; }
+.island { cursor:pointer; }
+.island-label { fill: var(--text); font-size:12px; opacity:.9; user-select:none; }
+.hint { position:absolute; left:12px; bottom:12px; background:rgba(255,255,255,.85); border:1px solid var(--border); padding:6px 10px; border-radius:8px; color:var(--sub); font-size:12px; }
+
+/* Trend */
+.panel-grow { display:flex; flex-direction:column; min-height: 280px; flex:1 1 0; }
+.chart-wrap { flex:1 1 auto; min-height: 220px; }
+
+/* Sidebar common */
+.crumbs { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px; font-size:14px; }
+.chip { padding:4px 8px; border-radius:8px; background:#f3f4f6; border:1px solid var(--border); }
+.chip-active { background:#ecfeff; border-color:#a5f3fc; color:#0369a1; }
+.chip-county { background:#f5f3ff; border-color:#ddd6fe; color:#5b21b6; }
+.chip-option { background:#fff; }
+.chip-selected { background:#f5f3ff; border-color:#ddd6fe; }
+.sep { opacity:.6; }
+.subhead { font-weight:500; margin-bottom:6px; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; }
+
+/* Stats grid */
+.stats { display:grid; grid-template-columns: 1fr; gap:12px; margin-top:12px; }
+@media (min-width:640px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+
+/* Slider */
+.slider-wrap { position:relative; padding-top:20px; }
+.slider-wrap input[type="range"] { width:100%; accent-color:#0891b2; }
+.bubble { position:absolute; top:0; transform: translate(-50%, -100%); background:#fff; border:1px solid var(--border); border-radius:8px; padding:2px 6px; font-size:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.slider-ends { display:flex; justify-content:space-between; color:var(--sub); font-size:12px; margin-top:6px; }
+
+/* Email */
+.summary { border:1px solid var(--border); background:#f3f4f6; border-radius:8px; padding:8px 10px; }
+.label { display:block; margin-top:12px; font-weight:500; }
+.input { margin-top:6px; width:100%; border:1px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:14px; }
+.input:focus { outline:2px solid #06b6d4; border-color:#06b6d4; }
+.error { color:#dc2626; }
+
+.footer { padding: 0 24px 24px; color:#9ca3af; font-size:12px; }

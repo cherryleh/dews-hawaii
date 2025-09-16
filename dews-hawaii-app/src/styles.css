@@ -1,1 +1,13 @@
 /* You can add global styles to this file, and also import other style files */
+/* src/styles.css (or styles.scss if you use SCSS) */
+:root {
+  --app-font: "Inter", "Noto Sans", system-ui, -apple-system, "Segoe UI",
+              Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+html, body {
+  font-family: var(--app-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
