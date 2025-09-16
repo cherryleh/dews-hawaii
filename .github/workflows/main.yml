@@ -25,7 +25,7 @@ jobs:
 
       - name: Build Angular app
         run: |
-          cd panaewa-app
+          cd dews-hawaii-app
           npm run build -- --configuration production
 
       - name: Deploy to GitHub Pages
