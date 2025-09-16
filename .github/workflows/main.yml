@@ -20,18 +20,45 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Compute repo name (for base-href)
+        run: echo "REPO_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+
       - name: Install dependencies
-        run: |
-          cd dews-hawaii-app
-          npm install
-
-      - name: Build Angular app
         working-directory: dews-hawaii-app
-        run: npm run build -- --configuration production --base-href /dews-hawaii-app/
+        run: npm ci || npm install
 
+      - name: Build Angular app (inject correct base-href)
+        working-directory: dews-hawaii-app
+        run: |
+          # If this is a user/org site like <user>.github.io, use "/" instead:
+          if [[ "$REPO_NAME" == *.github.io ]]; then
+            BASE="/"
+          else
+            BASE="/$REPO_NAME/"
+          fi
+          echo "Using base-href: $BASE"
+          npm run build -- --configuration production --base-href "$BASE"
+
+      - name: Sanity check built index.html
+        run: |
+          echo "----- base href in built index.html -----"
+          grep -o '<base href="[^"]*"' dews-hawaii-app/dist/**/browser/index.html || true
+          echo "----- list built files -----"
+          ls -R dews-hawaii-app/dist
+
+      # Optional: add a 404.html so deep links work
+      - name: Add SPA 404 redirect
+        run: |
+          DIST_DIR=$(dirname "$(find dews-hawaii-app/dist -name index.html | head -n1)")
+          cat > "$DIST_DIR/404.html" <<'HTML'
+          <!DOCTYPE html><html><head><meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=./index.html">
+          </head><body></body></html>
+          HTML
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
-          folder: dews-hawaii-app/dist/dews-hawaii-app/browser  
+          folder: dews-hawaii-app/dist/dews-hawaii-app/browser
+          clean: true
