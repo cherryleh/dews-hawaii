@@ -24,9 +24,9 @@ jobs:
           npm install
 
       - name: Build Angular app
-        run: |
-          cd dews-hawaii-app
-          npm run build -- --configuration production
+        working-directory: dews-hawaii-app
+        run: npm run build -- --configuration production --base-href /dews-hawaii-app/
+
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
