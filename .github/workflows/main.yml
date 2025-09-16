@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: write   # <-- allow pushing to gh-pages
+  contents: write   
 
 jobs:
   build-deploy:
@@ -14,11 +14,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js (with cache for subfolder)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+        node-version: 20
+        cache: npm
+        cache-dependency-path: dews-hawaii-app/package-lock.json
 
       - name: Install dependencies
         working-directory: dews-hawaii-app
