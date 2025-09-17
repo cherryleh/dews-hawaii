@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { geoIdentity, geoPath } from 'd3-geo';
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
-
+import * as d3 from 'd3';
 
 
 import { StatBoxComponent } from '../stat-box/stat-box.component';
@@ -54,6 +54,10 @@ export class ClimateDashboardComponent {
 
   unit = computed(() => this.selectedDataset() === 'Rainfall' ? 'in' : '°F');
   allDivisions: any;
+  statewideSPI: any[] = [];
+  islandSPI: any[] = [];
+  divisionSPI: any[] = [];
+
   ngOnInit() {
     this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
       const projection = geoIdentity()
@@ -61,9 +65,6 @@ export class ClimateDashboardComponent {
         .fitSize([560, 320], fc);
 
       const path = geoPath(projection as any);
-
-      console.log(fc.features[0].properties);
-
 
       const features = fc.features.map((f: any) => {
         const name = f.properties?.isle 
@@ -94,36 +95,53 @@ export class ClimateDashboardComponent {
       this.pathById.set(pathById);
       this.centroidById.set(centroidById);
     });
+
+    this.http.get('island_spi_timeseries.csv', { responseType: 'text' })
+      .subscribe(csv => {
+        this.islandSPI = this.parseCsv(csv, 'island');
+      });
+
+    // load division SPI
+    this.http.get('division_spi_timeseries.csv', { responseType: 'text' })
+      .subscribe(csv => {
+        this.divisionSPI = this.parseCsv(csv, 'division');
+      });
+
+    this.http.get('statewide_spi_timeseries.csv', { responseType: 'text' })
+    .subscribe(csv => {
+      this.statewideSPI = this.parseCsv(csv, 'state');
+
+      // initialize chart with statewide data
+      const stateData = this.statewideSPI
+        .filter(r => r.state.toLowerCase() === 'statewide')
+        .map(r => ({ month: r.month, value: r.value }));
+
+      this.tsData.set(stateData);
+    });
+
+  }
+
+  private parseCsv(csvData: string, labelKey: 'state' | 'island' | 'division') {
+    const rows = csvData.split('\n').map(r => r.split(','));
+    const headers = rows[0];
+    const data: any[] = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      if (!rows[i][0]) continue; // skip blank rows
+      const label = rows[i][0].trim();
+      for (let j = 1; j < headers.length; j++) {
+        data.push({
+          [labelKey]: label,
+          month: headers[j],
+          value: +rows[i][j]
+        });
+      }
+    }
+    return data;
   }
 
 
-  tsData = computed(() => {
-    const now = new Date();
-    const seedStr = `${this.selectedIsland()?.id || 'state'}|${this.selectedDivision() || 'state'}|${this.selectedDataset()}`;
-    let h = 0;
-    for (let i = 0; i < seedStr.length; i++) {
-      h = (h * 31 + seedStr.charCodeAt(i)) % 1000;
-    }
-    const phase = (h % 360) * Math.PI / 180;
-    const arr: { month: string; value: number }[] = [];
-
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const month = d.toLocaleString('en-US', { month: 'short' });
-      const t = (11 - i) / 11; // 0..1 across the year
-      const seasonal = Math.sin(t * 2 * Math.PI + phase);
-
-      let value = 3 * seasonal + ((h % 37) - 18) / 18; 
-      value = Math.max(-3, Math.min(3, value)); // clamp to [-3, 3]
-
-      // round to 1 decimal place
-      value = Math.round(value * 10) / 10;
-
-      arr.push({ month, value });
-    }
-
-    return arr;
-  });
+  tsData = signal<{ month: string; value: number }[]>([]);
 
 
   pickIsland(isle: Island) {
@@ -160,6 +178,22 @@ export class ClimateDashboardComponent {
       this.pathById.set(pathById);
       this.centroidById.set(centroidById);
     });
+
+    const islandData = this.islandSPI
+    .filter((r: any) => r.island.toLowerCase() === isle.name.toLowerCase())
+    .map((r: any) => ({ month: r.month, value: r.value }));
+
+    this.tsData.set(islandData);
+  }
+
+  pickDivision(d: string) {
+    this.selectedDivision.set(d);
+
+    const divisionData = this.divisionSPI
+      .filter((r: any) => r.division === d)
+      .map((r: any) => ({ month: r.month, value: r.value }));
+
+    this.tsData.set(divisionData);
   }
 
   reset() {
@@ -167,11 +201,11 @@ export class ClimateDashboardComponent {
     this.selectedDivision.set(null);
     this.viewMode.set('islands');  
 
+    // reload map
     this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
       const projection = geoIdentity()
         .reflectY(true)
         .fitSize([560, 320], fc);
-
       const path = geoPath(projection as any);
 
       const features = fc.features.map((f: any) => {
@@ -191,11 +225,16 @@ export class ClimateDashboardComponent {
       this.pathById.set(pathById);
       this.centroidById.set(centroidById);
     });
+    const stateData = this.statewideSPI
+      .filter(r => r.state.toLowerCase() === 'statewide')
+      .map(r => ({ month: r.month, value: r.value }));
+    this.tsData.set(stateData);
   }
 
 
 
-  pickDivision(d: string) { this.selectedDivision.set(d); }
+
+
   pickDataset(ds: 'Rainfall' | 'Temperature') { this.selectedDataset.set(ds); }
   setTimescale(m: number) { this.selectedTimescale.set(m); }
 
