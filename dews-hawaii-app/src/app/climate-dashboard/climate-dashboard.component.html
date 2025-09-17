@@ -4,7 +4,6 @@
       <div class="brand-badge">HI</div>
       <h1>Hawaii Climate Explorer</h1>
     </div>
-    <div class="note">Mock UI • Replace with live data later</div>
   </header>
 
   <div class="grid">
@@ -80,7 +79,6 @@
 
 
           </svg>
-          <div *ngIf="!selectedIsland()" class="hint">Tip: Replace with real outlines or Leaflet.</div>
         </div>
       </section>
 
@@ -89,14 +87,14 @@
         <div class="panel-head">
           <div>
             <div class="eyebrow">Trend</div>
-            <div class="title">{{ selectedDataset() }} — last 12 months</div>
+            <div class="title">SPI — last 12 months</div>
           </div>
           <div class="tiny">{{ selectedDivision() || selectedIsland()?.short || 'Statewide' }}</div>
         </div>
         <div class="chart-wrap">
           <app-spi-chart [data]="tsData()" [unit]="unit()"></app-spi-chart>
+
         </div>
-        <div class="tiny muted">Mock values for illustration.</div>
       </section>
     </div>
 
@@ -126,7 +124,6 @@
 
         <div class="actions">
           <button class="btn" (click)="reset()">Clear</button>
-          <button class="btn btn-primary" [disabled]="!selectedIsland()" (click)="subscribe()">View details</button>
         </div>
       </div>
 

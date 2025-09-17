@@ -7,7 +7,7 @@
 .topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border); }
 .brand { display:flex; align-items:center; gap:12px; }
 .brand-badge { width:36px; height:36px; border-radius:12px; background:#cffafe; border:1px solid #a5f3fc; display:flex; align-items:center; justify-content:center; font-weight:700; color:#0891b2; }
-.note { font-size:13px; color: var(--sub); }
+
 
 .grid { display:grid; grid-template-columns: 1fr; gap:24px; padding:24px; }
 @media (min-width:1024px) { .grid { grid-template-columns: 7fr 5fr; } }

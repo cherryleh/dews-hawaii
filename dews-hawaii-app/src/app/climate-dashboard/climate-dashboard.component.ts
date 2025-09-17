@@ -100,25 +100,31 @@ export class ClimateDashboardComponent {
   tsData = computed(() => {
     const now = new Date();
     const seedStr = `${this.selectedIsland()?.id || 'state'}|${this.selectedDivision() || 'state'}|${this.selectedDataset()}`;
-    let h = 0; for (let i = 0; i < seedStr.length; i++) h = (h * 31 + seedStr.charCodeAt(i)) % 1000;
+    let h = 0;
+    for (let i = 0; i < seedStr.length; i++) {
+      h = (h * 31 + seedStr.charCodeAt(i)) % 1000;
+    }
     const phase = (h % 360) * Math.PI / 180;
     const arr: { month: string; value: number }[] = [];
+
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const month = d.toLocaleString('en-US', { month: 'short' });
       const t = (11 - i) / 11; // 0..1 across the year
       const seasonal = Math.sin(t * 2 * Math.PI + phase);
-      let value: number;
-      if (this.selectedDataset() === 'Rainfall') {
-        value = Math.max(0, 2.2 + 1.4 * seasonal + ((h % 37) - 18) / 60);
-      } else {
-        value = 72 + 5 * seasonal + ((h % 37) - 18) / 10;
-      }
+
+      let value = 3 * seasonal + ((h % 37) - 18) / 18; 
+      value = Math.max(-3, Math.min(3, value)); // clamp to [-3, 3]
+
+      // round to 1 decimal place
       value = Math.round(value * 10) / 10;
+
       arr.push({ month, value });
     }
+
     return arr;
   });
+
 
   pickIsland(isle: Island) {
     this.selectedIsland.set(isle);

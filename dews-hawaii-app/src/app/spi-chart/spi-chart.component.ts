@@ -1,43 +1,60 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ChartData, ChartOptions } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
-import {
-  ChartConfiguration,
-  ChartData,
-  ChartOptions,
-  TooltipItem,
-} from 'chart.js';
 
 @Component({
   selector: 'app-spi-chart',
   standalone: true,
   imports: [CommonModule, BaseChartDirective], 
   templateUrl: './spi-chart.component.html',
-  styleUrls: ['./spi-chart.component.css'],
+  styleUrls: ['./spi-chart.component.css']
 })
 export class SpiChartComponent {
   @Input() data: { month: string; value: number }[] = [];
   @Input() unit: string = '';
 
-  chartData: ChartConfiguration['data'] = { labels: [], datasets: [] };
-  chartOptions: ChartConfiguration['options'] = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: { x: { grid: { display: false } }, y: { grid: { color: 'rgba(0,0,0,0.08)' } } },
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} ${this.unit}` } } }
-  };
+  @ViewChild(BaseChartDirective) chart?: BaseChartDirective;
 
-  ngOnChanges(_: SimpleChanges): void {
-    this.chartData = {
+  get chartData(): ChartData<'line'> {
+    return {
       labels: this.data.map(d => d.month),
-      datasets: [{
-        data: this.data.map(d => d.value),
-        borderColor: '#0284c7',
-        backgroundColor: 'rgba(14,165,233,0.2)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 2
-      }]
+      datasets: [
+        {
+          label: 'SPI',
+          data: this.data.map(d => d.value),
+          borderColor: 'rgba(37, 99, 235, 1)',  // blue line
+          backgroundColor: 'rgba(37, 99, 235, 0.2)', // optional point hover fill
+          tension: 0,        // smooth line
+          fill: false,         
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }
+      ]
+
     };
   }
+
+  chartOptions: ChartOptions<'line'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,   
+    plugins: {
+      legend: { display: true },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    scales: {
+      y: {
+        title: { display: true, text: 'SPI' },
+        min: -3,
+        max: 3,
+        ticks: { stepSize: 1 }
+      },
+      x: {
+        title: { display: true, text: 'Month' }
+      }
+    }
+  };
+
+
 }
