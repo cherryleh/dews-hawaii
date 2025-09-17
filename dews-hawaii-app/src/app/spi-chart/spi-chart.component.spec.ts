@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { TrendChartComponent } from './trend-chart.component';
+import { SpiChartComponent } from './spi-chart.component';
 
-describe('TrendChartComponent', () => {
-  let component: TrendChartComponent;
-  let fixture: ComponentFixture<TrendChartComponent>;
+describe('SpiChartComponent', () => {
+  let component: SpiChartComponent;
+  let fixture: ComponentFixture<SpiChartComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [TrendChartComponent]
+      imports: [SpiChartComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(TrendChartComponent);
+    fixture = TestBed.createComponent(SpiChartComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

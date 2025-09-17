@@ -94,7 +94,7 @@
           <div class="tiny">{{ selectedDivision() || selectedIsland()?.short || 'Statewide' }}</div>
         </div>
         <div class="chart-wrap">
-          <app-trend-chart [data]="tsData()" [unit]="unit()"></app-trend-chart>
+          <app-spi-chart [data]="tsData()" [unit]="unit()"></app-spi-chart>
         </div>
         <div class="tiny muted">Mock values for illustration.</div>
       </section>

@@ -8,7 +8,7 @@ import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 
 import { StatBoxComponent } from '../stat-box/stat-box.component';
-import { TrendChartComponent } from '../trend-chart/trend-chart.component';
+import { SpiChartComponent } from '../spi-chart/spi-chart.component';
 
 interface Island {
   id: string;
@@ -31,7 +31,7 @@ const DIVISIONS: Record<string, string[]> = {
   @Component({
     selector: 'app-climate-dashboard',
     standalone: true,
-    imports: [CommonModule, FormsModule, HttpClientModule, StatBoxComponent, TrendChartComponent],
+    imports: [CommonModule, FormsModule, HttpClientModule, StatBoxComponent, SpiChartComponent],
     templateUrl: './climate-dashboard.component.html',
     styleUrls: ['./climate-dashboard.component.css']
   })

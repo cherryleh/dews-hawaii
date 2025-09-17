@@ -9,14 +9,13 @@ import {
 } from 'chart.js';
 
 @Component({
-  selector: 'app-trend-chart',
+  selector: 'app-spi-chart',
   standalone: true,
-  imports: [CommonModule, BaseChartDirective], // <-- replace NgChartsModule
-  templateUrl: './trend-chart.component.html',
-  styleUrls: ['./trend-chart.component.css'],
+  imports: [CommonModule, BaseChartDirective], 
+  templateUrl: './spi-chart.component.html',
+  styleUrls: ['./spi-chart.component.css'],
 })
-
-export class TrendChartComponent implements OnChanges {
+export class SpiChartComponent {
   @Input() data: { month: string; value: number }[] = [];
   @Input() unit: string = '';
 
