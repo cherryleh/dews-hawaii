@@ -1,7 +1,24 @@
 import { Component, Input, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ChartData, ChartOptions } from 'chart.js';
+import { ChartData, ChartOptions, Chart } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
+
+// 🔴 Register plugin globally (outside the class)
+Chart.register({
+  id: 'shadePlugin',
+  beforeDraw: (chart: any) => {
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea) return;
+
+    const yBottom = scales['y'].getPixelForValue(-3);
+    const yTop = scales['y'].getPixelForValue(-1);
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.1)'; // light red shading
+    ctx.fillRect(chartArea.left, yTop, chartArea.right - chartArea.left, yBottom - yTop);
+    ctx.restore();
+  }
+});
 
 @Component({
   selector: 'app-spi-chart',
@@ -24,21 +41,20 @@ export class SpiChartComponent {
           label: 'SPI',
           data: this.data.map(d => d.value),
           borderColor: 'rgba(37, 99, 235, 1)',  // blue line
-          backgroundColor: 'rgba(37, 99, 235, 0.2)', // optional point hover fill
-          tension: 0,        // smooth line
+          backgroundColor: 'rgba(37, 99, 235, 0.2)',
+          tension: 0,
           fill: false,         
           pointRadius: 4,
           pointHoverRadius: 6
         }
       ]
-
     };
   }
 
   chartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
-    animation: false,   
+    animation: false,
     plugins: {
       legend: { display: true },
       tooltip: { mode: 'index', intersect: false }
@@ -55,6 +71,4 @@ export class SpiChartComponent {
       }
     }
   };
-
-
 }
