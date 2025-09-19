@@ -42,6 +42,7 @@
   stroke-width: 3px;
   paint-order: stroke; /* put outline behind text */
   pointer-events: none; /* don't block clicks */
+  mix-blend-mode: normal; 
 }
 
 .hint { position:absolute; left:12px; bottom:12px; background:rgba(255,255,255,.85); border:1px solid var(--border); padding:6px 10px; border-radius:8px; color:var(--sub); font-size:12px; }
@@ -68,7 +69,17 @@
 /* Slider */
 .slider-wrap { position:relative; padding-top:20px; }
 .slider-wrap input[type="range"] { width:100%; accent-color:#0891b2; }
-.bubble { position:absolute; top:0; transform: translate(-50%, -100%); background:#fff; border:1px solid var(--border); border-radius:8px; padding:2px 6px; font-size:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.bubble {
+  position: absolute;
+  top: 20px;
+  transform: translate(-50%, -120%); /* move bubble closer */
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px 6px;
+  font-size: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
 .slider-ends { display:flex; justify-content:space-between; color:var(--sub); font-size:12px; margin-top:6px; }
 
 /* Email */
@@ -79,3 +90,20 @@
 .error { color:#dc2626; }
 
 .footer { padding: 0 24px 24px; color:#9ca3af; font-size:12px; }
+
+.info-box {
+  display: block;           /* ensure it's a block element */
+  grid-column: 1 / -1;      /* span across full grid if inside a grid */
+  width: 100%;              /* always take full width */
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: #ecfeff;      /* light cyan background */
+  border-left: 4px solid #06b6d4; /* teal accent */
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+  box-sizing: border-box;   /* include padding in width */
+  white-space: normal;      /* allow wrapping if sentence is long */
+}

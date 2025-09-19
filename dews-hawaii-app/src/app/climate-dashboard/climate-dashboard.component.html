@@ -33,8 +33,10 @@
             </defs>
             <rect x="0" y="0" width="560" height="320" fill="url(#grid)" />
 
-            <g *ngFor="let feature of islands(); trackBy: trackByIsle">
+            <!-- Draw all island/division polygons first -->
+            <g class="features">
               <path
+                *ngFor="let feature of islands(); trackBy: trackByIsle"
                 [attr.d]="pathById()[feature.id]"
                 [attr.fill]="
                   viewMode() === 'divisions' && selectedDivision() === feature.name
@@ -64,16 +66,26 @@
                 "
                 (mouseover)="hoveredFeature.set(feature.name)"
                 (mouseout)="hoveredFeature.set(null)"
-                (click)="viewMode() === 'islands' ? pickIsland(feature) : pickDivision(feature.name)">
-              </path>
+                (click)="viewMode() === 'islands' ? pickIsland(feature) : pickDivision(feature.name)"
+              ></path>
+            </g>
 
-
-              <ng-container *ngIf="centroidById()[feature.id] as c">
-                <text [attr.x]="c[0]" [attr.y]="c[1] + 12" text-anchor="middle" class="island-label">
-                  {{ feature.short }}
-                </text>
+            <!-- Draw all labels on top -->
+            <g class="labels">
+              <ng-container *ngFor="let feature of islands(); trackBy: trackByIsle">
+                <ng-container *ngIf="centroidById()[feature.id] as c">
+                  <text
+                    [attr.x]="c[0]"
+                    [attr.y]="c[1] + 12"
+                    text-anchor="middle"
+                    class="island-label"
+                  >
+                    {{ feature.short }}
+                  </text>
+                </ng-container>
               </ng-container>
             </g>
+
 
 
 
@@ -121,6 +133,22 @@
           </div>
         </div>
 
+        <div class="mt">
+          <div class="subhead">Choose a time range</div>
+          <div class="chips">
+            <button class="chip chip-option" 
+                    [class.chip-selected]="selectedTimescale() === 1" 
+                    (click)="setTimescale(1)">Short Term</button>
+            <button class="chip chip-option" 
+                    [class.chip-selected]="selectedTimescale() === 6" 
+                    (click)="setTimescale(6)">Medium Term</button>
+            <button class="chip chip-option" 
+                    [class.chip-selected]="selectedTimescale() === 12" 
+                    (click)="setTimescale(12)">Long Term</button>
+          </div>
+        </div>
+
+
         <div class="actions">
           <button class="btn" (click)="reset()">Clear</button>
         </div>
@@ -130,10 +158,17 @@
         <div class="panel-head">
           <div>
             <div class="eyebrow">Climate snapshot</div>
-            <div class="title">{{ selectedDataset() }} – {{ selectedDivision() || selectedIsland()?.short || 'Statewide' }} • {{ selectedTimescale() }}-month</div>
+            <div class="title">
+              {{ selectedDataset() }} – {{ selectedDivision() || selectedIsland()?.short || 'Statewide' }} • {{ timeRangeLabel(selectedTimescale()) }}
+            </div>
+            
+
+
           </div>
         </div>
-
+        <div class="info-box">
+          Statewide saw exceptionally dry conditions in August (short term).
+        </div>
         <!-- Only show selected dataset; each stat in its own box -->
         <div *ngIf="selectedDataset() === 'Rainfall'; else tempStats" class="stats">
           <app-stat-box label="RF" value="1.97 in"></app-stat-box>
@@ -149,14 +184,14 @@
         </ng-template>
 
         <!-- Timescale slider 1..12 with bubble -->
-        <div class="mt">
+        <!-- <div class="mt">
           <div class="eyebrow">Time scale</div>
           <div class="slider-wrap">
             <input type="range" min="1" max="12" step="1" [ngModel]="selectedTimescale()" (ngModelChange)="setTimescale($event)"/>
             <div class="bubble" [ngStyle]="{ left: ((selectedTimescale() - 1) / 11 * 100) + '%' }">{{ selectedTimescale() }} mo</div>
             <div class="slider-ends"><span>1 mo</span><span>12 mo</span></div>
           </div>
-        </div>
+        </div> -->
       </div>
 
       <div class="panel">

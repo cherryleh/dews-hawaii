@@ -140,6 +140,14 @@ export class ClimateDashboardComponent {
     return data;
   }
 
+  timeRangeLabel(value: number): string {
+    switch (value) {
+      case 1: return 'Short Term';
+      case 6: return 'Medium Term';
+      case 12: return 'Long Term';
+      default: return `${value}-month`; // fallback
+    }
+  }
 
   tsData = signal<{ month: string; value: number }[]>([]);
 
