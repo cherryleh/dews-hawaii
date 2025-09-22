@@ -98,7 +98,7 @@
         <div class="panel-head">
           <div>
             <div class="eyebrow">Trend</div>
-            <div class="title">SPI — last 12 months</div>
+            <div class="title">SPI-{{ selectedTimescale() }} — last 12 months</div>
           </div>
           <div class="tiny">{{ selectedDivision() || selectedIsland()?.short || 'Statewide' }}</div>
         </div>
@@ -114,7 +114,7 @@
       <div class="panel">
         <div class="eyebrow">Selection</div>
         <div class="crumbs">
-          <span class="chip">Statewide</span>
+          <span class="chip" (click)="reset()">Statewide</span>
           <ng-container *ngIf="selectedIsland() as si">
             <span class="sep">›</span>
             <button class="chip chip-active" (click)="selectedDivision.set(null)">{{ si.short }}</button>
