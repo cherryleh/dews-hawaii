@@ -18,6 +18,39 @@
           <button *ngIf="selectedIsland()" class="btn" (click)="reset()">Reset</button>
         </div>
         <div class="map">
+          <div class="selection-overlay">
+            <div class="eyebrow">Selection</div>
+            <div class="crumbs">
+              <span class="chip" (click)="reset()">Statewide</span>
+              <ng-container *ngIf="selectedIsland() as si">
+                <span class="sep">›</span>
+                <button class="chip chip-active" (click)="selectedDivision.set(null)">
+                  {{ si.short }}
+                </button>
+                <ng-container *ngIf="selectedDivision() as sd">
+                  <span class="sep">›</span>
+                  <span class="chip chip-county">{{ sd }}</span>
+                </ng-container>
+              </ng-container>
+            </div>
+
+            <div class="scope-wrap">
+              <label for="scope" class="label tiny">Scope</label>
+              <div class="tiny muted mt-1" *ngIf="!selectedIsland()">
+                Select an island first to view by scope.
+              </div>
+              <select id="scope"
+                      class="input"
+                      [ngModel]="selectedScope()"
+                      (ngModelChange)="setScope($event)">
+                <option value="divisions">Climate Divisions</option>
+                <option value="moku">Moku</option>
+                <option value="ahupuaa">Ahupuaʻa</option>
+                <option value="watershed">Watersheds</option>
+              </select>
+              
+            </div>
+          </div>
           <svg viewBox="0 0 560 320" class="map-svg" role="img" aria-label="Hawaiʻi islands (abstract)">
             <defs>
               <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
@@ -74,12 +107,13 @@
             <g class="labels">
               <ng-container *ngFor="let feature of islands(); trackBy: trackByIsle">
                 <ng-container *ngIf="centroidById()[feature.id] as c">
-                  <text
-                    [attr.x]="c[0]"
-                    [attr.y]="c[1] + 12"
-                    text-anchor="middle"
-                    class="island-label"
-                  >
+                    <text
+                      *ngIf="selectedScope() !== 'ahupuaa'" 
+                      [attr.x]="c[0]"
+                      [attr.y]="c[1] + 12"
+                      text-anchor="middle"
+                      class="island-label"
+                    >
                     {{ feature.short }}
                   </text>
                 </ng-container>
@@ -112,18 +146,6 @@
     <!-- RIGHT SIDEBAR -->
     <aside class="aside">
       <div class="panel">
-        <div class="eyebrow">Selection</div>
-        <div class="crumbs">
-          <span class="chip" (click)="reset()">Statewide</span>
-          <ng-container *ngIf="selectedIsland() as si">
-            <span class="sep">›</span>
-            <button class="chip chip-active" (click)="selectedDivision.set(null)">{{ si.short }}</button>
-            <ng-container *ngIf="selectedDivision() as sd">
-              <span class="sep">›</span>
-              <span class="chip chip-county">{{ sd }}</span>
-            </ng-container>
-          </ng-container>
-        </div>
 
         <div class="mt">
           <div class="subhead">Choose a dataset</div>

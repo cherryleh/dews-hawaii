@@ -44,6 +44,7 @@ export class ClimateDashboardComponent {
   trackByIsle = (_: number, isle: { id: string | number }) => isle.id;
   trackByDivision = (_: number, d: string) => d;
   hoveredFeature = signal<string | null>(null);
+  hoveredLabel = signal<{ name: string; x: number; y: number } | null>(null);
 
   // State
   selectedIsland = signal<Island | null>(null);
@@ -59,6 +60,7 @@ export class ClimateDashboardComponent {
   divisionSPI: any[] = [];
 
   ngOnInit() {
+    
     this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
       const projection = geoIdentity()
         .reflectY(true)         // flip Y so north is up
@@ -101,6 +103,7 @@ export class ClimateDashboardComponent {
   }
 
   private loadSPIData(scale: number) {
+    // Island-level data (always the same)
     this.http.get(`island_spi${scale}.csv`, { responseType: 'text' })
       .subscribe(csv => {
         this.islandSPI = this.parseCsv(csv, 'island');
@@ -109,14 +112,31 @@ export class ClimateDashboardComponent {
         }
       });
 
-    this.http.get(`division_spi${scale}.csv`, { responseType: 'text' })
+    // Scope-specific data
+    const scope = this.selectedScope();
+    let file = '';
+    let labelKey: 'division' | 'moku' | 'ahupuaa';
+
+    if (scope === 'divisions') {
+      file = `division_spi${scale}.csv`;
+      labelKey = 'division';
+    } else if (scope === 'moku') {
+      file = `moku_spi${scale}.csv`;
+      labelKey = 'moku';
+    } else {
+      file = `ahupuaa_spi${scale}.csv`; // placeholder
+      labelKey = 'ahupuaa';
+    }
+
+    this.http.get(file, { responseType: 'text' })
       .subscribe(csv => {
-        this.divisionSPI = this.parseCsv(csv, 'division');
+        this.divisionSPI = this.parseCsv(csv, labelKey);
         if (this.selectedDivision()) {
           this.pickDivision(this.selectedDivision()!);
         }
       });
 
+    // Statewide always the same
     this.http.get(`statewide_spi${scale}.csv`, { responseType: 'text' })
       .subscribe(csv => {
         this.statewideSPI = this.parseCsv(csv, 'state');
@@ -129,15 +149,41 @@ export class ClimateDashboardComponent {
       });
   }
 
+  onHover(feature: any, event: MouseEvent) {
+    if (this.selectedScope() === 'ahupuaa') {
+      const svg = (event.target as SVGPathElement).ownerSVGElement!;
+      const pt = svg.createSVGPoint();
+      pt.x = event.clientX;
+      pt.y = event.clientY;
+      const screenCTM = svg.getScreenCTM();
+      if (screenCTM) {
+        const svgP = pt.matrixTransform(screenCTM.inverse());
+        this.hoveredLabel.set({ name: feature.name, x: svgP.x, y: svgP.y });
+      }
+    }
+  }
 
+  selectedScope = signal<'divisions' | 'moku' | 'ahupuaa'>('divisions');
 
-  private parseCsv(csvData: string, labelKey: 'state' | 'island' | 'division') {
+  setScope(scope: string) {
+    this.selectedScope.set(scope as any);
+
+    // If an island is already selected, reload it in the new scope
+    if (this.selectedIsland()) {
+      this.pickIsland(this.selectedIsland()!);
+    }
+  }
+
+  private parseCsv(
+    csvData: string,
+    labelKey: 'state' | 'island' | 'division' | 'moku' | 'ahupuaa'
+  ) {
     const rows = csvData.split('\n').map(r => r.split(','));
     const headers = rows[0];
     const data: any[] = [];
 
     for (let i = 1; i < rows.length; i++) {
-      if (!rows[i][0]) continue; // skip blank rows
+      if (!rows[i][0]) continue;
       const label = rows[i][0].trim();
       for (let j = 1; j < headers.length; j++) {
         data.push({
@@ -150,6 +196,7 @@ export class ClimateDashboardComponent {
     return data;
   }
 
+
   timeRangeLabel(value: number): string {
     switch (value) {
       case 1: return 'Short Term';
@@ -160,17 +207,47 @@ export class ClimateDashboardComponent {
   }
 
   tsData = signal<{ month: string; value: number }[]>([]);
-
+  // Return the first non-empty property found
+  private getProp(o: any, keys: string[]) {
+    for (const k of keys) {
+      const v = o?.[k];
+      if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+    }
+    return null;
+  }
 
   pickIsland(isle: Island) {
     this.selectedIsland.set(isle);
     this.selectedDivision.set(null);
     this.viewMode.set('divisions'); 
 
-    this.http.get<any>('hawaii_islands_divisions.geojson').subscribe((fc: any) => {
+    // choose file depending on scope
+    const file = this.selectedScope() === 'moku'
+      ? 'moku.geojson'
+    : this.selectedScope() === 'ahupuaa'
+    ? 'ahupuaa.geojson'
+    : 'hawaii_islands_divisions.geojson';
+    const isMoku = this.selectedScope() === 'moku';
+    const isAhupuaa = this.selectedScope() === 'ahupuaa';
+    
+    this.http.get<any>(file).subscribe((fc: any) => {
+      // filter features for this island
       const fcIsland = {
         type: 'FeatureCollection',
-        features: fc.features.filter((f: any) => f.properties?.isle === isle.name)
+        features: fc.features.filter((f: any) => {
+          const p = f.properties || {};
+          // what the feature uses to store island name
+          const featureIsland = this.getProp(p, ['mokupuni', 'island', 'Island', 'ISLAND', 'isle', 'Isle']);
+
+          if (isMoku || isAhupuaa) {
+            // moku / ahupua‘a files typically have "mokupuni" or "island"
+            return featureIsland === isle.name;
+          }
+
+          // divisions file
+          const divIsland = this.getProp(p, ['isle', 'island', 'Island']);
+          return divIsland === isle.name;
+        })
       } as FeatureCollection;
 
       const projection = geoIdentity()
@@ -180,10 +257,18 @@ export class ClimateDashboardComponent {
       const path = geoPath(projection as any);
 
       const features = fcIsland.features.map((f: any) => {
-        const name = f.properties?.division || f.properties?.name || 'Division';
-        const id = name.toLowerCase().replace(/\s+/g, '-');
+        const p = f.properties || {};
+        const name = isAhupuaa
+          ? (this.getProp(p, ['ahupuaa', 'Ahupuaʻa', 'Ahupuaa', 'AHUPUAA', 'AhuPuaa', 'AHUPUAA_N']) || 'Ahupuaʻa')
+          : isMoku
+            ? (this.getProp(p, ['moku', 'Moku', 'MOKU']) || 'Moku')
+            : (this.getProp(p, ['division', 'Division', 'name', 'NAME']) || 'Division');
+
+        const id = String(name).toLowerCase().replace(/\s+/g, '-');
+
         return { id, name, short: name, divisions: [], feature: f };
       });
+
 
       const pathById: Record<string, string> = {};
       const centroidById: Record<string, [number, number]> = {};
@@ -197,22 +282,28 @@ export class ClimateDashboardComponent {
       this.centroidById.set(centroidById);
     });
 
+    // update chart with island data (same as before)
     const islandData = this.islandSPI
-    .filter((r: any) => r.island.toLowerCase() === isle.name.toLowerCase())
-    .map((r: any) => ({ month: r.month, value: r.value }));
-
+      .filter((r: any) => r.island.toLowerCase() === isle.name.toLowerCase())
+      .map((r: any) => ({ month: r.month, value: r.value }));
     this.tsData.set(islandData);
   }
 
   pickDivision(d: string) {
     this.selectedDivision.set(d);
 
-    const divisionData = this.divisionSPI
-      .filter((r: any) => r.division === d)
+    const scope = this.selectedScope();
+    let key: 'division' | 'moku' | 'ahupuaa' = 'division';
+    if (scope === 'moku') key = 'moku';
+    else if (scope === 'ahupuaa') key = 'ahupuaa';
+
+    const data = this.divisionSPI
+      .filter((r: any) => r[key] === d)
       .map((r: any) => ({ month: r.month, value: r.value }));
 
-    this.tsData.set(divisionData);
+    this.tsData.set(data);
   }
+
 
   reset() {
     this.selectedIsland.set(null);
