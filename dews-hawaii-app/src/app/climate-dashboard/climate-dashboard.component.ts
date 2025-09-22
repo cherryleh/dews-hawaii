@@ -96,30 +96,40 @@ export class ClimateDashboardComponent {
       this.centroidById.set(centroidById);
     });
 
-    this.http.get('island_spi_timeseries.csv', { responseType: 'text' })
-      .subscribe(csv => {
-        this.islandSPI = this.parseCsv(csv, 'island');
-      });
-
-    // load division SPI
-    this.http.get('division_spi_timeseries.csv', { responseType: 'text' })
-      .subscribe(csv => {
-        this.divisionSPI = this.parseCsv(csv, 'division');
-      });
-
-    this.http.get('statewide_spi_timeseries.csv', { responseType: 'text' })
-    .subscribe(csv => {
-      this.statewideSPI = this.parseCsv(csv, 'state');
-
-      // initialize chart with statewide data
-      const stateData = this.statewideSPI
-        .filter(r => r.state.toLowerCase() === 'statewide')
-        .map(r => ({ month: r.month, value: r.value }));
-
-      this.tsData.set(stateData);
-    });
+    this.loadSPIData(1);
 
   }
+
+  private loadSPIData(scale: number) {
+    this.http.get(`island_spi${scale}.csv`, { responseType: 'text' })
+      .subscribe(csv => {
+        this.islandSPI = this.parseCsv(csv, 'island');
+        if (this.selectedIsland() && !this.selectedDivision()) {
+          this.pickIsland(this.selectedIsland()!);
+        }
+      });
+
+    this.http.get(`division_spi${scale}.csv`, { responseType: 'text' })
+      .subscribe(csv => {
+        this.divisionSPI = this.parseCsv(csv, 'division');
+        if (this.selectedDivision()) {
+          this.pickDivision(this.selectedDivision()!);
+        }
+      });
+
+    this.http.get(`statewide_spi${scale}.csv`, { responseType: 'text' })
+      .subscribe(csv => {
+        this.statewideSPI = this.parseCsv(csv, 'state');
+        if (!this.selectedIsland() && !this.selectedDivision()) {
+          const stateData = this.statewideSPI
+            .filter(r => r.state.toLowerCase() === 'statewide')
+            .map(r => ({ month: r.month, value: r.value }));
+          this.tsData.set(stateData);
+        }
+      });
+  }
+
+
 
   private parseCsv(csvData: string, labelKey: 'state' | 'island' | 'division') {
     const rows = csvData.split('\n').map(r => r.split(','));
@@ -244,7 +254,12 @@ export class ClimateDashboardComponent {
 
 
   pickDataset(ds: 'Rainfall' | 'Temperature') { this.selectedDataset.set(ds); }
-  setTimescale(m: number) { this.selectedTimescale.set(m); }
+  setTimescale(m: number) {
+    this.selectedTimescale.set(m);
+    this.loadSPIData(m);
+  }
+
+
 
   email = signal<string>('');
 
