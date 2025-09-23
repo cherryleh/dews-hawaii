@@ -48,6 +48,21 @@
                 <option value="ahupuaa">Ahupuaʻa</option>
                 <option value="watershed">Watersheds</option>
               </select>
+              <div class="scope-wrap" *ngIf="viewMode() === 'divisions'">
+                <label for="divisionSelect" class="label tiny">
+                  {{ selectedScope() | titlecase }}
+                </label>
+                <select id="divisionSelect"
+                        class="input mt-1"
+                        [ngModel]="selectedDivision()"
+                        (ngModelChange)="pickDivision($event)">
+                  <option *ngFor="let f of islands(); trackBy: trackByIsle" 
+                          [value]="f.name">
+                    {{ f.name }}
+                  </option>
+                </select>
+              </div>
+
               
             </div>
           </div>
@@ -97,25 +112,38 @@
                     ? 'url(#glow)'
                     : null
                 "
-                (mouseover)="hoveredFeature.set(feature.name)"
-                (mouseout)="hoveredFeature.set(null)"
+                (mouseover)="onHover(feature, $event)"
+                (mouseout)="hoveredLabel.set(null)"
                 (click)="viewMode() === 'islands' ? pickIsland(feature) : pickDivision(feature.name)"
               ></path>
             </g>
 
             <!-- Draw all labels on top -->
             <g class="labels">
+              <g *ngIf="viewMode() === 'divisions' && selectedScope() === 'ahupuaa' && hoveredLabel() as hl">
+                <text
+                  [attr.x]="hl.x"
+                  [attr.y]="hl.y - 6"
+                  text-anchor="middle"
+                  class="ahupuaa-label"
+                >
+                  {{ hl.name }}
+                </text>
+              </g>
+
+
               <ng-container *ngFor="let feature of islands(); trackBy: trackByIsle">
                 <ng-container *ngIf="centroidById()[feature.id] as c">
                     <text
-                      *ngIf="selectedScope() !== 'ahupuaa'" 
+                      *ngIf="!(viewMode() === 'divisions' && selectedScope() === 'ahupuaa')" 
                       [attr.x]="c[0]"
                       [attr.y]="c[1] + 12"
                       text-anchor="middle"
                       class="island-label"
                     >
-                    {{ feature.short }}
-                  </text>
+                      {{ feature.short }}
+                    </text>
+
                 </ng-container>
               </ng-container>
             </g>

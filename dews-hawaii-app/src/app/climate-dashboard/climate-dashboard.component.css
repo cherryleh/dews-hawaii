@@ -122,12 +122,12 @@
 
 .crumbs {
   display: flex;
-  flex-wrap: wrap;     /* ✅ allow wrapping */
-  gap: 6px;            /* spacing between chips/separators */
+  flex-wrap: wrap;     
+  gap: 6px;           
   align-items: center;
   margin-top: 6px;
   font-size: 14px;
-  word-break: break-word; /* break long words if needed */
+  word-break: break-word; 
 }
 
 .hover-label {
@@ -137,5 +137,5 @@
   paint-order: stroke;
   stroke: white;
   stroke-width: 2px;
-  pointer-events: none; /* prevent flicker */
+  pointer-events: none; 
 }
