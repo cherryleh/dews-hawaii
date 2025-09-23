@@ -139,3 +139,12 @@
   stroke-width: 2px;
   pointer-events: none; 
 }
+
+@media (min-width:640px) {
+  .stats-rainfall {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .stats:not(.stats-rainfall) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

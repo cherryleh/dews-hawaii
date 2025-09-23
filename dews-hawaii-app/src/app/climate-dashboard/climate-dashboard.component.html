@@ -220,10 +220,11 @@
           Statewide saw exceptionally dry conditions in August (short term).
         </div>
         <!-- Only show selected dataset; each stat in its own box -->
-        <div *ngIf="selectedDataset() === 'Rainfall'; else tempStats" class="stats">
-          <app-stat-box label="RF" value="1.97 in"></app-stat-box>
-          <app-stat-box label="Anomaly" value="-3.20 in"></app-stat-box>
+        <div *ngIf="selectedDataset() === 'Rainfall'; else tempStats" class="stats stats-rainfall">
+          <app-stat-box label="RF" value="2.0 in"></app-stat-box>
+          <app-stat-box label="Anomaly" value="-3.2 in"></app-stat-box>
           <app-stat-box label="Rank" value="Driest"></app-stat-box>
+          <app-stat-box label="SPI" value="-1.15"></app-stat-box>
         </div>
         <ng-template #tempStats>
           <div class="stats">

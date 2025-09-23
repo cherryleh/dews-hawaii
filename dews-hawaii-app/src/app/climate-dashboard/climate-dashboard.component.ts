@@ -49,7 +49,7 @@ export class ClimateDashboardComponent {
   // State
   selectedIsland = signal<Island | null>(null);
   selectedDivision = signal<string | null>(null);
-  selectedDataset = signal<'Rainfall' | 'Temperature'>('Rainfall');
+  selectedDataset = signal<'Rainfall' | 'Temperature' | 'NDVI'>('Rainfall');
   selectedTimescale = signal<number>(1); // 1..12
   viewMode = signal<'islands' | 'divisions'>('islands');
 
@@ -264,7 +264,7 @@ export class ClimateDashboardComponent {
             ? (this.getProp(p, ['moku', 'Moku', 'MOKU']) || 'Moku')
             : (this.getProp(p, ['division', 'Division', 'name', 'NAME']) || 'Division');
 
-        const id = String(name).toLowerCase().replace(/\s+/g, '-');
+        const id = `${isle.name}-${name}`.toLowerCase().replace(/\s+/g, '-');
 
         return { id, name, short: name, divisions: [], feature: f };
       });
