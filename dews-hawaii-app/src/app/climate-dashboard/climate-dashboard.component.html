@@ -97,7 +97,7 @@
                   Ahupuaʻa
                 </button>
               </div>
-              <div class="scope-wrap" *ngIf="viewMode() === 'divisions'">
+                <div class="scope-wrap" *ngIf="viewMode() === 'divisions' && selectedScope()">
                 <label for="divisionSelect" class="label tiny">
                   {{ selectedScope() | titlecase }}
                 </label>
@@ -155,6 +155,9 @@
                   : 1
                 "
                 (click)="viewMode() === 'islands' ? pickIsland(feature) : pickDivision(feature.key)"
+                (mouseenter)="hoveredFeature.set(feature.name)"
+                (mouseleave)="hoveredFeature.set(null)"
+                (mousemove)="onHover(feature, $event)"
               ></path>
 
 
