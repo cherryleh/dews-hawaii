@@ -123,6 +123,32 @@ export class ClimateDashboardComponent {
     return parts.length === 2 ? parts[1] : sel;
   });
 
+  private islandStubForCounty(county: string): Island | null {
+    const members = COUNTY_GROUPS[county];
+    if (!members || !members.length) return null;
+    const name = members[0]; // use the first island in that county group
+    const id = name.toLowerCase().replace(/\s+/g, '-');
+    return {
+      id,
+      name,
+      short: name,
+      divisions: DIVISIONS[name] || [],
+      feature: null,     // not needed for county flow; pickIsland refits with GeoJSON
+      key: id,
+    };
+  }
+
+  // Public handler for the chips
+  pickCounty(county: string) {
+    const stub = this.islandStubForCounty(county);
+    if (stub) this.pickIsland(stub);
+  }
+  
+  selectedCounty = computed(() => {
+    const isle = this.selectedIsland();
+    return isle ? getCountyForIsland(isle.name) : null;
+  });
+
   
   countyLabel = computed(() => {
     const isle = this.selectedIsland();

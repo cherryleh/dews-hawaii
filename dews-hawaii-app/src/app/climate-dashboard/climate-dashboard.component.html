@@ -30,25 +30,73 @@
                 <ng-container *ngIf="selectedDivision() as sd">
                   <span class="sep">›</span>
                   <span class="chip chip-county">{{ selectedDivisionName() }}</span>
-
                 </ng-container>
               </ng-container>
+            </div>
+            <!-- County quick-picks (always visible) -->
+            <div class="mt-1">
+              <div class="label tiny">Select County:</div>
+              <div class="chips">
+                <button
+                  class="chip chip-option"
+                  [class.chip-selected]="selectedCounty() === 'Kauaʻi'"
+                  (click)="pickCounty('Kauaʻi')"
+                >Kauaʻi</button>
+
+                <button
+                  class="chip chip-option"
+                  [class.chip-selected]="selectedCounty() === 'Honolulu'"
+                  (click)="pickCounty('Honolulu')"
+                >Honolulu</button>
+
+                <button
+                  class="chip chip-option"
+                  [class.chip-selected]="selectedCounty() === 'Maui'"
+                  (click)="pickCounty('Maui')"
+                >Maui</button>
+
+                <button
+                  class="chip chip-option"
+                  [class.chip-selected]="selectedCounty() === 'Hawaiʻi'"
+                  (click)="pickCounty('Hawaiʻi')"
+                >Hawaiʻi</button>
+              </div>
             </div>
 
             <div class="scope-wrap">
               <label for="scope" class="label tiny">Scope</label>
-              <div class="tiny muted mt-1" *ngIf="!selectedIsland()">
-                Select an island first to view by scope.
+              <!-- Scope chips -->
+              <div class="chips mt-1" role="tablist" aria-label="Scope">
+                <button
+                  class="chip chip-option"
+                  [class.chip-selected]="selectedScope() === 'divisions'"
+                  (click)="setScope('divisions')"
+                  role="tab"
+                  [attr.aria-selected]="selectedScope() === 'divisions' ? 'true' : 'false'"
+                >
+                  Climate Divisions
+                </button>
+
+                <button
+                  class="chip chip-option"
+                  [class.chip-selected]="selectedScope() === 'moku'"
+                  (click)="setScope('moku')"
+                  role="tab"
+                  [attr.aria-selected]="selectedScope() === 'moku' ? 'true' : 'false'"
+                >
+                  Moku
+                </button>
+
+                <button
+                  class="chip chip-option"
+                  [class.chip-selected]="selectedScope() === 'ahupuaa'"
+                  (click)="setScope('ahupuaa')"
+                  role="tab"
+                  [attr.aria-selected]="selectedScope() === 'ahupuaa' ? 'true' : 'false'"
+                >
+                  Ahupuaʻa
+                </button>
               </div>
-              <select id="scope"
-                      class="input"
-                      [ngModel]="selectedScope()"
-                      (ngModelChange)="setScope($event)">
-                <option value="divisions">Climate Divisions</option>
-                <option value="moku">Moku</option>
-                <option value="ahupuaa">Ahupuaʻa</option>
-                <option value="watershed">Watersheds</option>
-              </select>
               <div class="scope-wrap" *ngIf="viewMode() === 'divisions'">
                 <label for="divisionSelect" class="label tiny">
                   {{ selectedScope() | titlecase }}
