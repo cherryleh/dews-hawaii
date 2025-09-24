@@ -154,8 +154,11 @@
 
 @media (min-width:640px) {
   .stats-rainfall {
-    grid-template-columns: repeat(4, 1fr);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px; 
   }
+
   .stats:not(.stats-rainfall) {
     grid-template-columns: repeat(3, 1fr);
   }
