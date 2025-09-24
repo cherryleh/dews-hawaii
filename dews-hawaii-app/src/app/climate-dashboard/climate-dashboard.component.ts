@@ -9,6 +9,33 @@ import * as d3 from 'd3';
 
 import { StatBoxComponent } from '../stat-box/stat-box.component';
 import { SpiChartComponent } from '../spi-chart/spi-chart.component';
+// Island → County (only need what we use)
+const COUNTY_BY_ISLAND: Record<string, string> = {
+  'Kauaʻi': 'Kauaʻi',
+  'Oʻahu': 'Honolulu',
+  'Molokaʻi': 'Maui',
+  'Lānaʻi': 'Maui',
+  'Maui': 'Maui',
+  'Kahoʻolawe': 'Maui',
+  'Hawaiʻi': 'Hawaiʻi'
+};
+
+// County → list of islands
+const COUNTY_GROUPS: Record<string, string[]> = {
+  'Kauaʻi': ['Kauaʻi'],
+  'Honolulu': ['Oʻahu'],
+  'Maui': ['Maui', 'Molokaʻi', 'Lānaʻi', 'Kahoʻolawe'],
+  'Hawaiʻi': ['Hawaiʻi']
+};
+
+function getCountyForIsland(islandName: string): string {
+  return COUNTY_BY_ISLAND[islandName] ?? islandName;
+}
+
+function getIslandsInSameCounty(islandName: string): string[] {
+  const c = getCountyForIsland(islandName);
+  return COUNTY_GROUPS[c] ?? [islandName];
+}
 
 interface Island {
   id: string;
@@ -16,7 +43,10 @@ interface Island {
   short: string;
   divisions: string[];
   feature: any;
+  key: string;        // <-- required now
+  island?: string;
 }
+
 
 const DIVISIONS: Record<string, string[]> = {
   'Kauaʻi': ['North Kauaʻi', 'South Kauaʻi'],
@@ -27,6 +57,32 @@ const DIVISIONS: Record<string, string[]> = {
   'Kahoʻolawe': ['Kahoʻolawe'],
   'Hawaiʻi': ['Hawaiʻi Mauka', 'Windward Kohala', 'Kaʻu', 'Hilo', 'Leeward Kohala', 'Kona'],
 };
+
+  function canonIsland(name: string): string {
+    if (!name) return '';
+    return name
+      .normalize('NFD')                 // split diacritics
+      .replace(/\p{Diacritic}/gu, '')   // strip macrons
+      .replace(/['’ʻ`]/g, '')           // strip okina/apostrophes
+      .toLowerCase()
+      .trim();
+  }
+
+  const CANON_TO_DISPLAY: Record<string, string> = {
+    kauai: 'Kauaʻi',
+    niihau: 'Niʻihau',
+    oahu: 'Oʻahu',
+    molokai: 'Molokaʻi',
+    lanai: 'Lānaʻi',
+    maui: 'Maui',
+    kahoolawe: 'Kahoʻolawe',
+    hawaii: 'Hawaiʻi',
+  };
+  function prettyIsland(canon?: string) {
+    return canon ? (CANON_TO_DISPLAY[canon] ?? canon) : '';
+  }
+
+
 
   @Component({
     selector: 'app-climate-dashboard',
@@ -59,6 +115,25 @@ export class ClimateDashboardComponent {
   islandSPI: any[] = [];
   divisionSPI: any[] = [];
 
+  selectedDivisionName = computed(() => {
+    const sel = this.selectedDivision();
+    if (!sel) return null;
+    // handle either "island::Name" or just "Name"
+    const parts = sel.split('::');
+    return parts.length === 2 ? parts[1] : sel;
+  });
+
+  
+  countyLabel = computed(() => {
+    const isle = this.selectedIsland();
+    if (!isle) return null;
+    const county = getCountyForIsland(isle.name);
+    const members = getIslandsInSameCounty(isle.name);
+    // Only show "County" if it’s a multi-island county
+    return members.length > 1 ? `${county} County` : isle.short;
+  });
+
+
   ngOnInit() {
     
     this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
@@ -80,7 +155,8 @@ export class ClimateDashboardComponent {
           name,
           short: name,
           divisions: DIVISIONS[name] || [],
-          feature: f
+          feature: f,
+          key: id
         };
         this.http.get<any>('hawaii_islands_divisions.geojson').subscribe(fc => this.allDivisions = fc);
       });
@@ -219,56 +295,63 @@ export class ClimateDashboardComponent {
   pickIsland(isle: Island) {
     this.selectedIsland.set(isle);
     this.selectedDivision.set(null);
-    this.viewMode.set('divisions'); 
+    this.viewMode.set('divisions');
+
+    // Determine the group (e.g., Maui County group)
+    const groupIslands = new Set(getIslandsInSameCounty(isle.name));
 
     // choose file depending on scope
     const file = this.selectedScope() === 'moku'
       ? 'moku.geojson'
-    : this.selectedScope() === 'ahupuaa'
-    ? 'ahupuaa.geojson'
-    : 'hawaii_islands_divisions.geojson';
+      : this.selectedScope() === 'ahupuaa'
+        ? 'ahupuaa.geojson'
+        : 'hawaii_islands_divisions.geojson';
+
     const isMoku = this.selectedScope() === 'moku';
     const isAhupuaa = this.selectedScope() === 'ahupuaa';
-    
-    this.http.get<any>(file).subscribe((fc: any) => {
-      // filter features for this island
-      const fcIsland = {
-        type: 'FeatureCollection',
-        features: fc.features.filter((f: any) => {
-          const p = f.properties || {};
-          // what the feature uses to store island name
-          const featureIsland = this.getProp(p, ['mokupuni', 'island', 'Island', 'ISLAND', 'isle', 'Isle']);
 
-          if (isMoku || isAhupuaa) {
-            // moku / ahupua‘a files typically have "mokupuni" or "island"
-            return featureIsland === isle.name;
-          }
+    const groupCanon = new Set(getIslandsInSameCounty(isle.name).map(canonIsland));
 
-          // divisions file
-          const divIsland = this.getProp(p, ['isle', 'island', 'Island']);
-          return divIsland === isle.name;
-        })
-      } as FeatureCollection;
+      this.http.get<any>(file).subscribe((fc: any) => {
+        const fcCounty = {
+          type: 'FeatureCollection',
+          features: fc.features.filter((f: any) => {
+            const p = f.properties || {};
+            const featureIslandRaw = this.getProp(p, ['mokupuni', 'island', 'Island', 'ISLAND', 'isle', 'Isle']);
+            const featureIslandCanon = canonIsland(String(featureIslandRaw || ''));
+            return groupCanon.has(featureIslandCanon);
+          })
+        } as FeatureCollection;
 
+      // Fit projection to the combined county features
       const projection = geoIdentity()
         .reflectY(true)
-        .fitSize([560, 320], fcIsland);
+        .fitSize([560, 320], fcCounty);
 
       const path = geoPath(projection as any);
 
-      const features = fcIsland.features.map((f: any) => {
+      const features = fcCounty.features.map((f: any) => {
         const p = f.properties || {};
+        const isAhupuaa = this.selectedScope() === 'ahupuaa';
+        const isMoku = this.selectedScope() === 'moku';
+
         const name = isAhupuaa
           ? (this.getProp(p, ['ahupuaa', 'Ahupuaʻa', 'Ahupuaa', 'AHUPUAA', 'AhuPuaa', 'AHUPUAA_N']) || 'Ahupuaʻa')
           : isMoku
             ? (this.getProp(p, ['moku', 'Moku', 'MOKU']) || 'Moku')
             : (this.getProp(p, ['division', 'Division', 'name', 'NAME']) || 'Division');
 
-        const id = `${isle.name}-${name}`.toLowerCase().replace(/\s+/g, '-');
+        const islandRaw = this.getProp(p, ['mokupuni', 'island', 'Island', 'ISLAND', 'isle', 'Isle']) || isle.name;
+        const islandCanon = canonIsland(String(islandRaw));
 
-        return { id, name, short: name, divisions: [], feature: f };
+        // Unique key for selection/highlight (prevents duplicate-name collisions)
+        const key = `${islandCanon}::${name}`;
+
+        // ID for pathById lookup (safe for attrs)
+        const id = `${islandCanon}-${name}`.toLowerCase().replace(/\s+/g, '-');
+
+        return { id, key, name, short: name, island: islandCanon, divisions: [], feature: f };
       });
-
 
       const pathById: Record<string, string> = {};
       const centroidById: Record<string, [number, number]> = {};
@@ -282,12 +365,27 @@ export class ClimateDashboardComponent {
       this.centroidById.set(centroidById);
     });
 
-    // update chart with island data (same as before)
-    const islandData = this.islandSPI
+    // ---- Trend: average island SPI across the whole county group ----
+    // this.islandSPI is shaped like: { island, month, value }
+    const byMonth: Record<string, number[]> = {};
+    for (const r of this.islandSPI) {
+      if (groupIslands.has((r.island || '').trim())) {
+        if (!byMonth[r.month]) byMonth[r.month] = [];
+        byMonth[r.month].push(+r.value);
+      }
+    }
+    const averaged = Object.keys(byMonth).sort().map(m => ({
+      month: m,
+      value: byMonth[m].reduce((a, b) => a + b, 0) / byMonth[m].length
+    }));
+
+    // Fallback: if we somehow didn't match anything, just show the clicked island
+    this.tsData.set(averaged.length ? averaged : this.islandSPI
       .filter((r: any) => r.island.toLowerCase() === isle.name.toLowerCase())
-      .map((r: any) => ({ month: r.month, value: r.value }));
-    this.tsData.set(islandData);
+      .map((r: any) => ({ month: r.month, value: r.value }))
+    );
   }
+
 
   pickDivision(d: string) {
     this.selectedDivision.set(d);
@@ -320,7 +418,7 @@ export class ClimateDashboardComponent {
       const features = fc.features.map((f: any) => {
         const name = f.properties?.isle || 'Island';
         const id = name.toLowerCase().replace(/\s+/g, '-');
-        return { id, name, short: name, divisions: [], feature: f };
+        return { id, name, short: name, divisions: [], feature: f, key: id } as Island;
       });
 
       const pathById: Record<string, string> = {};

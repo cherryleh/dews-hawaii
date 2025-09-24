@@ -25,11 +25,12 @@
               <ng-container *ngIf="selectedIsland() as si">
                 <span class="sep">›</span>
                 <button class="chip chip-active" (click)="selectedDivision.set(null)">
-                  {{ si.short }}
+                  {{ countyLabel() || si.short }}
                 </button>
                 <ng-container *ngIf="selectedDivision() as sd">
                   <span class="sep">›</span>
-                  <span class="chip chip-county">{{ sd }}</span>
+                  <span class="chip chip-county">{{ selectedDivisionName() }}</span>
+
                 </ng-container>
               </ng-container>
             </div>
@@ -56,10 +57,10 @@
                         class="input mt-1"
                         [ngModel]="selectedDivision()"
                         (ngModelChange)="pickDivision($event)">
-                  <option *ngFor="let f of islands(); trackBy: trackByIsle" 
-                          [value]="f.name">
+                  <option *ngFor="let f of islands(); trackBy: trackByIsle" [value]="f.key">
                     {{ f.name }}
                   </option>
+
                 </select>
               </div>
 
@@ -87,35 +88,28 @@
                 *ngFor="let feature of islands(); trackBy: trackByIsle"
                 [attr.d]="pathById()[feature.id]"
                 [attr.fill]="
-                  viewMode() === 'divisions' && selectedDivision() === feature.name
+                  viewMode() === 'divisions' && selectedDivision() === feature.key
                     ? 'var(--primary)'
                     : hoveredFeature() === feature.name
                       ? '#cbd5e1'
                       : '#e5e7eb'
                 "
                 [attr.stroke]="
-                  viewMode() === 'divisions' && selectedDivision() === feature.name
+                  viewMode() === 'divisions' && selectedDivision() === feature.key
                     ? 'var(--ring)'
                     : hoveredFeature() === feature.name
                       ? '#6b7280'
                       : '#9ca3af'
                 "
                 [attr.stroke-width]="
-                  viewMode() === 'divisions' && selectedDivision() === feature.name
-                    ? 2
-                    : hoveredFeature() === feature.name
-                      ? 2
-                      : 1
+                  viewMode() === 'divisions' && selectedDivision() === feature.key ? 2
+                  : hoveredFeature() === feature.name ? 2
+                  : 1
                 "
-                [attr.filter]="
-                  viewMode() === 'divisions' && selectedDivision() === feature.name
-                    ? 'url(#glow)'
-                    : null
-                "
-                (mouseover)="onHover(feature, $event)"
-                (mouseout)="hoveredLabel.set(null)"
-                (click)="viewMode() === 'islands' ? pickIsland(feature) : pickDivision(feature.name)"
+                (click)="viewMode() === 'islands' ? pickIsland(feature) : pickDivision(feature.key)"
               ></path>
+
+
             </g>
 
             <!-- Draw all labels on top -->
