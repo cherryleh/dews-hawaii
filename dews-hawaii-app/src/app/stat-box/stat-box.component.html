@@ -1,4 +1,7 @@
 <div class="stat">
   <div class="stat-label">{{ label }}</div>
-  <div class="stat-value">{{ value }}</div>
+  <div class="stat-value">
+    <span class="stat-value-text">{{ value }}</span>
+    <span *ngIf="note" class="stat-note-inline">{{ note }}</span>
+  </div>
 </div>

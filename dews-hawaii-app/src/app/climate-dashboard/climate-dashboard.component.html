@@ -64,7 +64,7 @@
             </div>
 
             <div class="scope-wrap">
-              <label for="scope" class="label tiny">Scope</label>
+              <label for="scope" class="label tiny">Select division:</label>
               <!-- Scope chips -->
               <div class="chips mt-1" role="tablist" aria-label="Scope">
                 <button
@@ -268,16 +268,18 @@
         <div *ngIf="selectedDataset() === 'Rainfall'; else tempStats" class="stats stats-rainfall">
           <app-stat-box label="RF" value="2.0 in"></app-stat-box>
           <app-stat-box label="Anomaly" value="-3.2 in"></app-stat-box>
-          <app-stat-box label="Rank" value="Driest"></app-stat-box>
+          <app-stat-box label="Rank" value="Driest" note="out of 35 years"></app-stat-box>
           <app-stat-box label="SPI" value="Exceptionally Dry"></app-stat-box>
         </div>
+
         <ng-template #tempStats>
           <div class="stats">
             <app-stat-box label="Temp" value="70.0 °F"></app-stat-box>
             <app-stat-box label="Anomaly" value="0.6 °F"></app-stat-box>
-            <app-stat-box label="Rank" value="9th Warmest"></app-stat-box>
+            <app-stat-box label="Rank" value="9th Warmest" note="out of 35 years"></app-stat-box>
           </div>
         </ng-template>
+
 
         <!-- Timescale slider 1..12 with bubble -->
         <!-- <div class="mt">

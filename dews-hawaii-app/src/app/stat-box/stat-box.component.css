@@ -1,3 +1,21 @@
 .stat { background:#f3f4f6; border:1px solid #e5e7eb; border-radius:12px; padding:12px; display:flex; flex-direction:column; }
 .stat-label { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#4b5563; }
-.stat-value { margin-top:4px; font-size:22px; font-weight:600; color:#111827; }
+.stat-value { display: flex; align-items: baseline; gap: 8px; margin-top:4px; font-size:22px; font-weight:600; color:#111827; }
+
+.stat-note {
+  padding-top: 6px;
+  font-size: 14px;
+  color: var(--sub);
+  border-top: 1px dashed rgba(0,0,0,.06);
+}
+
+.stat-note-inline {
+  font-size: 14px;
+  font-weight: 400;
+  
+  color: var(--sub);
+}
+.stat-note-inline::before {
+  content: "  ";
+  color: var(--sub);
+}
