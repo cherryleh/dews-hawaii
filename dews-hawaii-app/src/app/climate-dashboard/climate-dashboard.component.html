@@ -68,12 +68,38 @@
 
         <ng-template #tempOrSpi>
           <div class="stats">
-            <ng-container *ngIf="selectedDataset() === 'Temperature'; else emptyRow">
-              <app-stat-box label="Temp" value="70.0 °F"></app-stat-box>
-              <app-stat-box label="Anomaly" value="+0.6 °F"></app-stat-box>
+            <!-- Rank adapts -->
+            <ng-container [ngSwitch]="selectedDataset()">
+              <app-stat-box
+                *ngSwitchCase="'Rainfall'"
+                label="Rank"
+                value="Driest"
+                note="out of 35 years">
+              </app-stat-box>
+
+              <app-stat-box
+                *ngSwitchCase="'Temperature'"
+                label="Rank"
+                value="Warmest"
+                note="out of 35 years">
+              </app-stat-box>
+
+              <app-stat-box
+                *ngSwitchDefault
+                label="Rank"
+                value="—"
+                note="not available">
+              </app-stat-box>
             </ng-container>
-            <ng-template #emptyRow></ng-template>
+
+            <!-- SPI only for rainfall/drought -->
+            <app-stat-box
+              *ngIf="selectedDataset() === 'Rainfall' || selectedDataset() === 'Drought'"
+              label="SPI"
+              value="Exceptionally Dry">
+            </app-stat-box>
           </div>
+
         </ng-template>
 
         <!-- Shared row: Rank | SPI -->
@@ -87,7 +113,10 @@
         <div class="panel-head">
           <div>
             <div class="eyebrow">Map</div>
-            <div class="title">Click an island to explore</div>
+            <div class="title">Select a geography for area-specific climate insights</div>
+            <div class="tiny muted">
+              {{ selectedDataset() }} August 2025
+            </div>
           </div>
           <button *ngIf="selectedIsland()" class="btn" (click)="reset()">Reset</button>
         </div>
@@ -221,36 +250,34 @@
                 *ngFor="let feature of islands(); trackBy: trackByIsle"
                 [attr.d]="pathById()[feature.id]"
 
-                [attr.fill]="
-                  selectedDataset() === 'Rainfall'
-                    ? (hoveredFeature() === feature.name ? '#ffffff' : 'transparent')
-                    : (viewMode() === 'divisions' && selectedDivision() === feature.key
-                        ? 'var(--primary)'
-                        : (hoveredFeature() === feature.name ? '#cbd5e1' : '#e5e7eb'))
-                "
-                [attr.fill-opacity]="
-                  selectedDataset() === 'Rainfall'
-                    ? (hoveredFeature() === feature.name ? 0.35 : 0.001)   
-                    : 1
-                "
-
+                fill="transparent"
                 [attr.pointer-events]="'all'"
 
                 [attr.stroke]="
-                  (viewMode() === 'divisions' && selectedDivision() === feature.key)
-                    ? 'var(--ring)'
+                  (viewMode() === 'divisions' && selectedDivision() === feature.key) ||
+                  (viewMode() === 'islands' && selectedIsland()?.id === feature.id)
+                    ? 'var(--primary)'
                     : (hoveredFeature() === feature.name ? '#6b7280' : '#9ca3af')
                 "
                 [attr.stroke-width]="
-                  ((viewMode() === 'divisions' && selectedDivision() === feature.key) ||
-                   hoveredFeature() === feature.name) ? 2 : 1
+                  (viewMode() === 'divisions' && selectedDivision() === feature.key) ||
+                  (viewMode() === 'islands' && selectedIsland()?.id === feature.id)
+                    ? 2
+                    : (hoveredFeature() === feature.name ? 2 : 1)
+                "
+                [attr.filter]="
+                  (viewMode() === 'divisions' && selectedDivision() === feature.key) ||
+                  (viewMode() === 'islands' && selectedIsland()?.id === feature.id)
+                    ? 'url(#glow)'
+                    : null
                 "
 
                 (click)="viewMode() === 'islands' ? pickIsland(feature) : pickDivision(feature.key)"
                 (mouseenter)="hoveredFeature.set(feature.name)"
                 (mouseleave)="hoveredFeature.set(null)"
-                (mousemove)="onHover(feature, $event)"
               ></path>
+
+
             </g>
 
 

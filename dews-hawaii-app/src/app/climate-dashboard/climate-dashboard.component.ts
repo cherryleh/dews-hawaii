@@ -72,6 +72,8 @@ function canonIsland(name: string): string {
     .trim();
 }
 
+
+
 @Component({
   selector: 'app-climate-dashboard',
   standalone: true,
@@ -147,17 +149,27 @@ export class ClimateDashboardComponent implements OnDestroy {
     const id = name.toLowerCase().replace(/\s+/g, '-');
     return { id, name, short: name, divisions: DIVISIONS[name] || [], feature: null, key: id };
   }
+
   pickCounty(county: string) {
+    // Clear any active division and scope when a county is chosen
+    this.selectedDivision.set(null);
+    this.selectedScope.set(null);
+    this.viewMode.set('islands');
+
     const stub = this.islandStubForCounty(county);
-    if (stub) this.pickIsland(stub);
+    if (stub) {
+      this.pickIsland(stub);
+    }
   }
+
+
 
   // ===== Chart data (sidebar) =====
   tsData = signal<{ month: string; value: number }[]>([]);
   timeRangeLabel(ts: number): string {
     if (ts === 1) return 'Last month';
     if (ts === 6) return 'Last 6 months';
-    if (ts === 12) return 'Last year';
+    if (ts === 12) return 'Last 12 months';
     return `${ts}-month`;
   }
 

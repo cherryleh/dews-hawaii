@@ -243,3 +243,29 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.snapshot-hero {
+  background: linear-gradient(135deg, #f0f9ff, #ffffff);
+  border: 2px solid var(--primary);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+  padding: 20px;
+}
+
+.snapshot-hero .eyebrow {
+  color: var(--primary);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.snapshot-hero .title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.panel-head .tiny.muted {
+  margin-top: 2px;
+  font-size: 15px;
+  color: var(--sub);
+}
