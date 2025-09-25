@@ -281,8 +281,10 @@
       <section class="panel panel-grow" [class.fullscreen]="chartFullscreen()">
         <div class="panel-head">
           <div>
-            <div class="eyebrow">Trend</div>
-            <div class="title">Drought in the last 12 months (SPI-{{ selectedTimescale() }})</div>
+            <div class="title">
+              {{ selectedDataset() }} graph
+            </div>
+
           </div>
           <div class="actions">
             <button class="btn" (click)="toggleChartFullscreen()">

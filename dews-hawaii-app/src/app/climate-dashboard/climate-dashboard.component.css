@@ -216,3 +216,30 @@
 
 .panel-grow { min-height: 400px; }
 .chart-wrap { min-height: 400px; }
+
+/* Make the snapshot hero a 4-col grid */
+.snapshot-hero {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* Keep header/controls/statement spanning full width */
+.snapshot-hero .panel-head,
+.snapshot-hero .snapshot-controls,
+.snapshot-hero .info-box {
+  grid-column: 1 / -1;
+}
+
+/* Flatten the two stats rows so their children share the same grid */
+.snapshot-hero .stats,
+.snapshot-hero .stats-rainfall {
+  display: contents;
+}
+
+/* Mobile: fall back to 2-up */
+@media (max-width: 639px) {
+  .snapshot-hero {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
