@@ -14,7 +14,7 @@ import { Pool } from 'geotiff';
 import { interpolateViridis } from 'd3-scale-chromatic';
 
 type Scope = 'divisions' | 'moku' | 'ahupuaa';
-type Dataset = 'Rainfall' | 'Temperature' | 'SPI';
+type Dataset = 'Rainfall' | 'Temperature' | 'Drought';
 
 interface Island {
   id: string;
@@ -200,7 +200,7 @@ export class ClimateDashboardComponent implements OnDestroy {
   // Read & colorize TIFF once; reuse bitmap as projection changes
   private async loadRasterOnce() {
     try {
-      const tiff = await GeoTIFF.fromUrl('rainfall_2025_08.tif');
+      const tiff = await GeoTIFF.fromUrl('/tifs/rainfall_2025_08.tif');
       const image = await tiff.getImage();
 
       // Geo bbox [minX, minY, maxX, maxY]
