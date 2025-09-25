@@ -15,7 +15,7 @@
           <div>
             <div class="eyebrow">Climate snapshot</div>
             <div class="title">
-              {{ selectedDataset() }} – {{ selectedDivision() || selectedIsland()?.short || 'Statewide' }} • {{ timeRangeLabel(selectedTimescale()) }}
+              {{ selectedDataset() }} – {{ selectedDivision()|| 'Statewide' }} • {{ timeRangeLabel(selectedTimescale()) }}
             </div>
           </div>
 
@@ -233,7 +233,7 @@
             </defs>
             <rect x="0" y="0" width="560" height="320" fill="url(#grid)" />
             <image
-              *ngIf="rasterHref() && rasterRect() && selectedDataset() === 'Rainfall'"
+              *ngIf="rasterHref() && rasterRect()"
               [attr.href]="rasterHref()"
               [attr.x]="rasterRect()!.x"
               [attr.y]="rasterRect()!.y"
@@ -243,6 +243,7 @@
               style="pointer-events:none"
               opacity="0.9"
             />
+
 
             <!-- Draw all island/division polygons first -->
             <g class="features">

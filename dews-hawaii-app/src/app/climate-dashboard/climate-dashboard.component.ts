@@ -11,7 +11,8 @@ import { SpiChartComponent } from '../spi-chart/spi-chart.component';
 
 import * as GeoTIFF from 'geotiff';
 import { Pool } from 'geotiff';
-import { interpolateViridis } from 'd3-scale-chromatic';
+import { interpolateViridis, interpolateRdBu } from 'd3-scale-chromatic';
+
 
 type Scope = 'divisions' | 'moku' | 'ahupuaa';
 type Dataset = 'Rainfall' | 'Temperature' | 'Drought';
@@ -72,6 +73,7 @@ function canonIsland(name: string): string {
     .trim();
 }
 
+let colorScale: d3.ScaleSequential<string> | d3.ScaleDiverging<string>;
 
 
 @Component({
@@ -103,11 +105,9 @@ export class ClimateDashboardComponent implements OnDestroy {
   selectedDataset() { return this.dataset(); }
   pickDataset(d: Dataset) {
     this.dataset.set(d);
-    // Lazy-load raster only when Rainfall is selected
-    if (d === 'Rainfall' && !this.rasterHref()) {
-      this.loadRasterOnce();
-    }
+    this.loadRasterOnce(d);
   }
+
   setTimescale(m: number) { this.selectedTimescale.set(m); this.loadSPIData(m); }
   unit = computed(() => this.selectedDataset() === 'Rainfall' ? 'in' : '°F');
 
@@ -210,13 +210,16 @@ export class ClimateDashboardComponent implements OnDestroy {
   }
 
   // Read & colorize TIFF once; reuse bitmap as projection changes
-  private async loadRasterOnce() {
-    try {
-      const tiff = await GeoTIFF.fromUrl('/tifs/rainfall_2025_08.tif');
-      const image = await tiff.getImage();
+  private async loadRasterOnce(dataset: Dataset) {
+      try {
+        let file = '';
+        if (dataset === 'Rainfall') file = '/tifs/rainfall_2025_08.tif';
+        else if (dataset === 'Temperature') file = '/tifs/tmean_2025_08.tif';
+        else if (dataset === 'Drought') file = '/tifs/spi1_2025_08.tif';
 
-      // Geo bbox [minX, minY, maxX, maxY]
-      this.rasterBBox = image.getBoundingBox() as [number, number, number, number];
+        const tiff = await GeoTIFF.fromUrl(file);
+        const image = await tiff.getImage();
+        this.rasterBBox = image.getBoundingBox() as [number, number, number, number];
 
       // Downsample target resolution based on SVG (560×320)
       const baseW = 560;
@@ -252,8 +255,26 @@ export class ClimateDashboardComponent implements OnDestroy {
       }
       if (!Number.isFinite(min) || !Number.isFinite(max)) { min = 0; max = 1; }
 
-      // Viridis reversed for rainfall
-      const colorScale = d3.scaleSequential(interpolateViridis).domain([max, min]);
+      if (dataset === 'Drought') {
+        min = -3;
+        max = 3;
+      }
+      
+
+      if (dataset === 'Rainfall') {
+        // Viridis reversed (high = dark purple, low = yellow)
+        colorScale = d3.scaleSequential(interpolateViridis).domain([max, min]);
+      } else if (dataset === 'Temperature') {
+        // Regular Viridis (low = purple, high = yellow)
+        colorScale = d3.scaleSequential(interpolateViridis).domain([min, max]);
+      } else if (dataset === 'Drought') {
+        // Blue → White → Red, centered at 0
+        const absMax = Math.max(Math.abs(min), Math.abs(max));
+        colorScale = d3.scaleDiverging(interpolateRdBu).domain([-absMax, 0, absMax]);
+      } else {
+        // Fallback
+        colorScale = d3.scaleSequential(interpolateViridis).domain([min, max]);
+      }
 
       // Paint to canvas → Blob URL
       const canvas = document.createElement('canvas');
@@ -286,19 +307,23 @@ export class ClimateDashboardComponent implements OnDestroy {
       if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
       this.objectUrl = URL.createObjectURL(blob);
       this.rasterHref.set(this.objectUrl);
-
-      // Position for current projection
       this.updateRasterRect();
     } catch (err) {
-      console.error('Failed to load rainfall_2025_08.tif', err);
+      console.error(`Failed to load raster for ${dataset}`, err);
     }
   }
 
   private getNoDataValue(image: any): number | undefined {
-    const tag = image?.fileDirectory?.GDAL_NODATA ?? image?.getGDALNoData?.();
-    if (tag != null) {
-      const n = Number(tag);
-      return Number.isFinite(n) ? n : undefined;
+    const candidates = [
+      image?.fileDirectory?.GDAL_NODATA,
+      image?.fileDirectory?.NoData,
+      image?.getGDALNoData?.()
+    ];
+    for (const tag of candidates) {
+      if (tag != null) {
+        const n = Number(tag);
+        if (Number.isFinite(n)) return n;
+      }
     }
     return undefined;
   }
@@ -332,7 +357,8 @@ export class ClimateDashboardComponent implements OnDestroy {
 
       // initial raster placement; raster loads lazily when dataset === 'Rainfall'
       this.updateRasterRect();
-      if (this.selectedDataset() === 'Rainfall') this.loadRasterOnce();
+      if (this.selectedDataset() === 'Rainfall') this.loadRasterOnce('Rainfall');
+
     });
 
     // Divisions metadata (optional)
