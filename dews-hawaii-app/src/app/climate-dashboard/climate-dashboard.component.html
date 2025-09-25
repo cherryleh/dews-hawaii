@@ -203,36 +203,47 @@
               </pattern>
             </defs>
             <rect x="0" y="0" width="560" height="320" fill="url(#grid)" />
+            <!-- Raster image (rain) -->
+            <ng-container *ngIf="rasterUrl() && rasterBox() as rb">
+              <defs>
+                <clipPath id="countyClip">
+                  <path *ngFor="let feature of islands(); trackBy: trackByIsle"
+                        [attr.d]="pathById()[feature.id]"></path>
+                </clipPath>
+              </defs>
+              <!-- <image
+                [attr.href]="rasterUrl()!"
+                [attr.x]="rb.x" [attr.y]="rb.y"
+                [attr.width]="rb.w" [attr.height]="rb.h"
+                clip-path="url(#countyClip)"
+                opacity="0.9"
+                preserveAspectRatio="none">
+              </image> -->
+              <image
+                [attr.href]="rasterUrl()!"
+                [attr.x]="rb.x" [attr.y]="rb.y"
+                [attr.width]="rb.w" [attr.height]="rb.h"
+                opacity="0.9"
+                preserveAspectRatio="none">
+              </image>
+            </ng-container>
+
 
             <!-- Draw all island/division polygons first -->
             <g class="features">
               <path
                 *ngFor="let feature of islands(); trackBy: trackByIsle"
                 [attr.d]="pathById()[feature.id]"
-                [attr.fill]="
-                  viewMode() === 'divisions' && selectedDivision() === feature.key
-                    ? 'var(--primary)'
-                    : hoveredFeature() === feature.name
-                      ? '#cbd5e1'
-                      : '#e5e7eb'
-                "
-                [attr.stroke]="
-                  viewMode() === 'divisions' && selectedDivision() === feature.key
-                    ? 'var(--ring)'
-                    : hoveredFeature() === feature.name
-                      ? '#6b7280'
-                      : '#9ca3af'
-                "
-                [attr.stroke-width]="
-                  viewMode() === 'divisions' && selectedDivision() === feature.key ? 2
-                  : hoveredFeature() === feature.name ? 2
-                  : 1
-                "
+                [attr.fill]="(viewMode() === 'divisions' && selectedDivision() === feature.key) ? 'rgba(14,165,233,0.15)' : (hoveredFeature() === feature.name ? 'rgba(0,0,0,0.08)' : 'transparent')"
+                [attr.stroke]="(viewMode() === 'divisions' && selectedDivision() === feature.key) ? 'var(--ring)' : (hoveredFeature() === feature.name ? '#6b7280' : '#374151')"
+                [attr.stroke-width]="(viewMode() === 'divisions' && selectedDivision() === feature.key) ? 2 : (hoveredFeature() === feature.name ? 2 : 1)"
                 (click)="viewMode() === 'islands' ? pickIsland(feature) : pickDivision(feature.key)"
                 (mouseenter)="hoveredFeature.set(feature.name)"
                 (mouseleave)="hoveredFeature.set(null)"
                 (mousemove)="onHover(feature, $event)"
               ></path>
+
+
 
 
             </g>

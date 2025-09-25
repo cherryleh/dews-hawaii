@@ -5,7 +5,12 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { geoIdentity, geoPath } from 'd3-geo';
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 import * as d3 from 'd3';
-
+import * as GeoTIFF from 'geotiff';
+import { scaleSequential } from 'd3-scale';
+import { extent } from 'd3-array';
+import { interpolateViridis } from 'd3-scale-chromatic';
+import { ChangeDetectionStrategy, NgZone } from '@angular/core';
+import { Pool } from 'geotiff';
 
 import { StatBoxComponent } from '../stat-box/stat-box.component';
 import { SpiChartComponent } from '../spi-chart/spi-chart.component';
@@ -86,10 +91,13 @@ const DIVISIONS: Record<string, string[]> = {
     return canon ? (CANON_TO_DISPLAY[canon] ?? canon) : '';
   }
 
+  // at the top of your component
+  const DEBUG = true;
 
 
   @Component({
     selector: 'app-climate-dashboard',
+    changeDetection: ChangeDetectionStrategy.OnPush,
     standalone: true,
     imports: [CommonModule, FormsModule, HttpClientModule, StatBoxComponent, SpiChartComponent],
     templateUrl: './climate-dashboard.component.html',
@@ -97,7 +105,7 @@ const DIVISIONS: Record<string, string[]> = {
   })
 
 export class ClimateDashboardComponent {
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private zone: NgZone) {}
   islands = signal<Island[]>([]);
   pathById = signal<Record<string, string>>({});
   centroidById = signal<Record<string, [number, number]>>({});
@@ -114,6 +122,10 @@ export class ClimateDashboardComponent {
   // State
   dataset = signal<Dataset>('Rainfall');         // one source of truth
   selectedTimescale = signal<number>(6);         // default to 6 to match UI
+
+  rasterUrl = signal<string | null>(null);
+  rasterBox = signal<{ x: number; y: number; w: number; h: number } | null>(null);
+  nodataValue: number | null = null;
 
   // Helpers used by template
   selectedDataset() { return this.dataset(); }   // so {{ selectedDataset() }} works
@@ -156,6 +168,154 @@ export class ClimateDashboardComponent {
     };
   }
 
+  private async renderRainTiffToSvg(
+    tiffUrl: string,
+    projection: any,
+    maxOutput = 1024
+  ) {
+    try {
+      if (DEBUG) {
+        console.groupCollapsed(`[TIFF→PNG] ${tiffUrl}`);
+        console.time('renderRainTiffToSvg');
+        const a = document.createElement('a'); a.href = tiffUrl;
+        console.log('Resolved URL:', a.href);
+      }
+
+      const tiff = await GeoTIFF.fromUrl(tiffUrl);
+      const img = await tiff.getImage();
+
+      const width = img.getWidth();
+      const height = img.getHeight();
+      if (DEBUG) console.log('TIFF size:', { width, height });
+
+      // ----- bbox / georef (with fallback) -----
+      let bbox = img.getBoundingBox?.();
+      if (!bbox || !bbox.every(Number.isFinite)) {
+        const origin = (img as any).getOrigin?.();
+        const res = (img as any).getResolution?.();
+        if (origin && res) {
+          const minX = origin[0], maxY = origin[1];
+          const maxX = origin[0] + res[0] * width;
+          const minY = origin[1] - res[1] * height;
+          bbox = [minX, minY, maxX, maxY];
+          if (DEBUG) console.warn('Using origin/resolution fallback bbox:', bbox);
+        } else {
+          console.error('No usable georeferencing on TIFF.');
+          return;
+        }
+      }
+      const [minX, minY, maxX, maxY] = bbox;
+
+      // ----- downsample size -----
+      const scale = Math.min(1, maxOutput / Math.max(width, height));
+      const readW = Math.max(1, Math.round(width * scale));
+      const readH = Math.max(1, Math.round(height * scale));
+      if (DEBUG) console.log('Read size:', { readW, readH, scale });
+
+      // ----- read rasters (NEAREST + NoData) -----
+      const ndRaw = img.getGDALNoData?.();
+      const nodataValue = ndRaw != null ? Number(ndRaw) : null;
+      this.nodataValue = nodataValue;
+      const EPS = 1e-6;
+
+      const ras = await img.readRasters({
+        samples: [0],
+        width: readW,
+        height: readH,
+        interleave: true,
+        resampleMethod: 'nearest',
+        ...(nodataValue != null ? { fillValue: nodataValue } : {})
+      });
+      const data = ras as Float32Array | Uint16Array | number[];
+      if (DEBUG) {
+        console.log('dtype:', Object.prototype.toString.call(data), 'len:', data.length);
+        console.log('first samples:', Array.from((data as any).slice(0, 8)));
+        console.log('NoData:', nodataValue);
+      }
+
+      const isNoData = (v: number) =>
+        !Number.isFinite(v) ||
+        (nodataValue != null && (v === nodataValue || Math.abs(v - nodataValue) < EPS)) ||
+        v < -1e20;
+
+      // ----- domain ignoring NoData -----
+      const finiteVals: number[] = [];
+      for (let i = 0; i < data.length; i++) {
+        const v = data[i] as number;
+        if (!isNoData(v)) finiteVals.push(v);
+      }
+      if (!finiteVals.length) { console.warn('No finite values (all NoData?)'); return; }
+
+      const [vmin, vmax] = extent(finiteVals) as [number, number];
+      const color = scaleSequential(interpolateViridis).domain([vmax, vmin]); // reversed
+
+      // ----- paint to canvas -----
+      const canvas = document.createElement('canvas');
+      canvas.width = readW; canvas.height = readH;
+      const ctx = canvas.getContext('2d')!;
+      const imgData = ctx.createImageData(readW, readH);
+
+      let j = 0;
+      for (let i = 0; i < data.length; i++) {
+        const v = data[i] as number;
+        if (isNoData(v)) {
+          imgData.data[j++] = 0; imgData.data[j++] = 0; imgData.data[j++] = 0; imgData.data[j++] = 0;
+        } else {
+          const c = (d3 as any).rgb(color(v));
+          imgData.data[j++] = c.r; imgData.data[j++] = c.g; imgData.data[j++] = c.b; imgData.data[j++] = 200;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      const dataUrl = canvas.toDataURL('image/png');
+      if (DEBUG) console.log('dataURL len:', dataUrl.length, dataUrl.slice(0, 40) + '…');
+      this.rasterUrl.set(dataUrl);
+
+      // ----- project 4 corners → image box -----
+      const corners = [
+        projection([minX, minY]),
+        projection([minX, maxY]),
+        projection([maxX, minY]),
+        projection([maxX, maxY]),
+      ].filter(Boolean) as [number, number][];
+
+      if (!corners.length) { console.error('Projection returned null for all corners.'); return; }
+
+      const xs = corners.map(c => c[0]);
+      const ys = corners.map(c => c[1]);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      const w = Math.max(...xs) - x;
+      const h = Math.max(...ys) - y;
+      if (!(isFinite(w) && isFinite(h) && w > 0 && h > 0)) {
+        console.error('Projected box invalid:', { x, y, w, h, corners }); return;
+      }
+      this.rasterBox.set({ x, y, w, h });
+      if (DEBUG) console.log('Projected box:', { x, y, w, h });
+
+      // inspect the rendered <image>
+      setTimeout(() => {
+        const imgEl = document.querySelector<SVGImageElement>('svg.map-svg image');
+        if (!imgEl) return;
+        const href = imgEl.getAttribute('href');
+        const hrefXL = imgEl.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+        const clip = imgEl.getAttribute('clip-path');
+        console.log('DOM image attrs:', { href, hrefXL, clip });
+        if (href?.startsWith('unsafe:') || hrefXL?.startsWith('unsafe:')) {
+          console.error('Angular sanitization is blocking the data URL.');
+        }
+      }, 0);
+
+      if (DEBUG) { console.timeEnd('renderRainTiffToSvg'); console.groupEnd(); }
+    } catch (err) {
+      console.error('renderRainTiffToSvg failed:', err);
+      this.rasterUrl.set(null);
+      this.rasterBox.set(null);
+    }
+  }
+
+
+
   // Public handler for the chips
   pickCounty(county: string) {
     const stub = this.islandStubForCounty(county);
@@ -183,28 +343,40 @@ export class ClimateDashboardComponent {
       const projection = geoIdentity().reflectY(true).fitSize([560, 320], fc);
       const path = geoPath(projection as any);
 
+      // 🔽 build & set features FIRST so map shows no matter what
       const features = fc.features.map((f: any) => {
         const name = f.properties?.isle || f.properties?.island || f.properties?.name || 'Unknown';
         const id = name.toLowerCase().replace(/\s+/g, '-');
         return <Island>{ id, name, short: name, divisions: DIVISIONS[name] || [], feature: f, key: id };
       });
-
       const pathById: Record<string, string> = {};
       const centroidById: Record<string, [number, number]> = {};
       for (const is of features) {
         pathById[is.id] = path(is.feature)!;
         centroidById[is.id] = path.centroid(is.feature) as [number, number];
       }
-
       this.islands.set(features);
       this.pathById.set(pathById);
       this.centroidById.set(centroidById);
-    });
 
+      // 🔽 then kick off raster render without await; never block the map
+      if (this.selectedDataset() === 'Rainfall') {
+        this.renderRainTiffToSvg('rainfall_2025_08.tif', projection)
+          .catch(err => {
+            console.error('Raster render failed:', err);
+            this.rasterUrl.set(null);
+            this.rasterBox.set(null);
+          });
+      } else {
+        this.rasterUrl.set(null);
+        this.rasterBox.set(null);
+      }
+    });
     // Load scoped divisions metadata (if you need it later)
     this.http.get<any>('hawaii_islands_divisions.geojson').subscribe(fc => this.allDivisions = fc);
 
     this.loadSPIData(this.selectedTimescale()); // start with 6 if you chose 6 above
+    
   }
 
 
@@ -332,7 +504,7 @@ export class ClimateDashboardComponent {
       // --- NO SCOPE: county = group of island outlines ---
       this.viewMode.set('islands');
 
-      this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
+        this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
         const fcCounty = {
           type: 'FeatureCollection',
           features: fc.features.filter((f: any) => {
@@ -350,8 +522,26 @@ export class ClimateDashboardComponent {
           return { id, key: id, name, short: name, divisions: [], feature: f } as Island;
         });
 
+
         const pathById: Record<string, string> = {};
         const centroidById: Record<string, [number, number]> = {};
+
+        this.islands.set(features);
+        this.pathById.set(pathById);
+        this.centroidById.set(centroidById);
+
+        if (this.selectedDataset() === 'Rainfall') {
+          this.renderRainTiffToSvg('rainfall_2025_08.tif', projection)
+            .catch(err => {
+              console.error('Raster render failed:', err);
+              this.rasterUrl.set(null);
+              this.rasterBox.set(null);
+            });
+        } else {
+          this.rasterUrl.set(null);
+          this.rasterBox.set(null);
+        }
+
         for (const d of features) {
           pathById[d.id] = path(d.feature)!;
           centroidById[d.id] = path.centroid(d.feature) as [number, number];
