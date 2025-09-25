@@ -9,6 +9,80 @@
     <!-- LEFT COLUMN: Map + Trend stacked to match sidebar height -->
     <div class="left-col">
       <!-- Map Panel -->
+      <!-- Climate Snapshot — hero at the top-left -->
+      <section class="panel snapshot-hero">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Climate snapshot</div>
+            <div class="title">
+              {{ selectedDataset() }} – {{ selectedDivision() || selectedIsland()?.short || 'Statewide' }} • {{ timeRangeLabel(selectedTimescale()) }}
+            </div>
+          </div>
+
+          <!-- Controls bar -->
+          <div class="snapshot-controls">
+            <!-- Dataset -->
+            <div class="control" role="group" aria-labelledby="datasetLabel">
+              <div class="tiny muted" id="datasetLabel">Select a dataset</div>
+              <div class="chips chips-toggle" role="tablist" aria-label="Dataset">
+                <button class="chip chip-option"
+                        [class.chip-selected]="selectedDataset() === 'Rainfall'"
+                        (click)="pickDataset('Rainfall')">Rainfall</button>
+                <button class="chip chip-option"
+                        [class.chip-selected]="selectedDataset() === 'Temperature'"
+                        (click)="pickDataset('Temperature')">Temperature</button>
+                <button class="chip chip-option"
+                        [class.chip-selected]="selectedDataset() === 'SPI'"
+                        (click)="pickDataset('SPI')">SPI</button>
+              </div>
+            </div>
+
+            <!-- Time scale -->
+            <div class="control" role="group" aria-labelledby="timescaleLabel">
+              <div class="tiny muted" id="timescaleLabel">Select a time scale</div>
+              <div class="chips">
+                <button class="chip chip-option"
+                        [class.chip-selected]="selectedTimescale() === 1"
+                        (click)="setTimescale(1)">Last month</button>
+                <button class="chip chip-option"
+                        [class.chip-selected]="selectedTimescale() === 6"
+                        (click)="setTimescale(6)">Last 6 months</button>
+                <button class="chip chip-option"
+                        [class.chip-selected]="selectedTimescale() === 12"
+                        (click)="setTimescale(12)">Last 12 months</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Statement -->
+        <div class="info-box">
+          Statewide saw exceptionally dry conditions in August (short term).
+        </div>
+
+        <!-- Tiles -->
+        <div *ngIf="selectedDataset() === 'Rainfall'; else tempOrSpi" class="stats stats-rainfall">
+          <app-stat-box label="RF" value="2.0 in"></app-stat-box>
+          <app-stat-box label="Anomaly" value="-3.2 in"></app-stat-box>
+        </div>
+
+        <ng-template #tempOrSpi>
+          <div class="stats">
+            <ng-container *ngIf="selectedDataset() === 'Temperature'; else emptyRow">
+              <app-stat-box label="Temp" value="70.0 °F"></app-stat-box>
+              <app-stat-box label="Anomaly" value="+0.6 °F"></app-stat-box>
+            </ng-container>
+            <ng-template #emptyRow></ng-template>
+          </div>
+        </ng-template>
+
+        <!-- Shared row: Rank | SPI -->
+        <div class="stats">
+          <app-stat-box label="Rank" value="Driest" note="out of 35 years"></app-stat-box>
+          <app-stat-box label="SPI" value="Exceptionally Dry"></app-stat-box>
+        </div>
+      </section>
+
       <section class="panel panel-grow">
         <div class="panel-head">
           <div>
@@ -200,97 +274,29 @@
         </div>
       </section>
 
-      <!-- Trend Panel -->
-      <section class="panel panel-grow">
-        <div class="panel-head">
-          <div>
-            <div class="eyebrow">Trend</div>
-            <div class="title">SPI-{{ selectedTimescale() }} — last 12 months</div>
-          </div>
-          <div class="tiny">{{ selectedDivision() || selectedIsland()?.short || 'Statewide' }}</div>
-        </div>
-        <div class="chart-wrap">
-          <app-spi-chart [data]="tsData()" [unit]="unit()"></app-spi-chart>
-
-        </div>
-      </section>
     </div>
 
     <!-- RIGHT SIDEBAR -->
     <aside class="aside">
-      <div class="panel">
-
-        <div class="mt">
-          <div class="subhead">Choose a dataset</div>
-          <div class="chips">
-            <button class="chip chip-option" [class.chip-selected]="selectedDataset() === 'Rainfall'" (click)="pickDataset('Rainfall')">Rainfall</button>
-            <button class="chip chip-option" [class.chip-selected]="selectedDataset() === 'Temperature'" (click)="pickDataset('Temperature')">Temperature</button>
-          </div>
-        </div>
-
-        <div class="mt">
-          <div class="subhead">Choose a time range</div>
-          <div class="chips">
-            <button class="chip chip-option" 
-                    [class.chip-selected]="selectedTimescale() === 1" 
-                    (click)="setTimescale(1)">Short Term</button>
-            <button class="chip chip-option" 
-                    [class.chip-selected]="selectedTimescale() === 6" 
-                    (click)="setTimescale(6)">Medium Term</button>
-            <button class="chip chip-option" 
-                    [class.chip-selected]="selectedTimescale() === 12" 
-                    (click)="setTimescale(12)">Long Term</button>
-          </div>
-        </div>
-
-
-        <div class="actions">
-          <button class="btn" (click)="reset()">Clear</button>
-        </div>
-      </div>
-
-      <div class="panel">
+      <section class="panel panel-grow" [class.fullscreen]="chartFullscreen()">
         <div class="panel-head">
           <div>
-            <div class="eyebrow">Climate snapshot</div>
-            <div class="title">
-              {{ selectedDataset() }} – {{ selectedDivision() || selectedIsland()?.short || 'Statewide' }} • {{ timeRangeLabel(selectedTimescale()) }}
-            </div>
-            
-
-
+            <div class="eyebrow">Trend</div>
+            <div class="title">Drought in the last 12 months (SPI-{{ selectedTimescale() }})</div>
+          </div>
+          <div class="actions">
+            <button class="btn" (click)="toggleChartFullscreen()">
+              {{ chartFullscreen() ? 'Close' : 'Expand' }}
+            </button>
           </div>
         </div>
-        <div class="info-box">
-          Statewide saw exceptionally dry conditions in August (short term).
+
+        <div class="chart-wrap">
+          <app-spi-chart [data]="tsData()" [unit]="unit()"></app-spi-chart>
         </div>
-        <!-- Only show selected dataset; each stat in its own box -->
-        <div *ngIf="selectedDataset() === 'Rainfall'; else tempStats" class="stats stats-rainfall">
-          <app-stat-box label="RF" value="2.0 in"></app-stat-box>
-          <app-stat-box label="Anomaly" value="-3.2 in"></app-stat-box>
-          <app-stat-box label="Rank" value="Driest" note="out of 35 years"></app-stat-box>
-          <app-stat-box label="SPI" value="Exceptionally Dry"></app-stat-box>
-        </div>
-
-        <ng-template #tempStats>
-          <div class="stats">
-            <app-stat-box label="Temp" value="70.0 °F"></app-stat-box>
-            <app-stat-box label="Anomaly" value="0.6 °F"></app-stat-box>
-            <app-stat-box label="Rank" value="9th Warmest" note="out of 35 years"></app-stat-box>
-          </div>
-        </ng-template>
+      </section>
 
 
-        <!-- Timescale slider 1..12 with bubble -->
-        <!-- <div class="mt">
-          <div class="eyebrow">Time scale</div>
-          <div class="slider-wrap">
-            <input type="range" min="1" max="12" step="1" [ngModel]="selectedTimescale()" (ngModelChange)="setTimescale($event)"/>
-            <div class="bubble" [ngStyle]="{ left: ((selectedTimescale() - 1) / 11 * 100) + '%' }">{{ selectedTimescale() }} mo</div>
-            <div class="slider-ends"><span>1 mo</span><span>12 mo</span></div>
-          </div>
-        </div> -->
-      </div>
 
       <div class="panel">
         <div class="eyebrow">Monthly email reports</div>

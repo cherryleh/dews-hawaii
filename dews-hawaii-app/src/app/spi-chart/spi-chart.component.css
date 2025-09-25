@@ -1,11 +1,11 @@
 .chart {
   width: 100%;
-  height: 300px;   /* panel sets the height */
+  height: 90%;   /* panel sets the height */
   position: relative; /* required for Chart.js sizing */
 }
 
 
 .chart canvas {
   width: 100% !important;   /* force full width */
-  height: 300px !important; /* fixed height so it doesn’t collapse */
+  height: 100% !important; /* fixed height so it doesn’t collapse */
 }

@@ -39,6 +39,7 @@ function getIslandsInSameCounty(islandName: string): string[] {
   const c = getCountyForIsland(islandName);
   return COUNTY_GROUPS[c] ?? [islandName];
 }
+type Dataset = 'Rainfall' | 'Temperature' | 'SPI';
 
 interface Island {
   id: string;
@@ -108,8 +109,22 @@ export class ClimateDashboardComponent {
   // State
   selectedIsland = signal<Island | null>(null);
   selectedDivision = signal<string | null>(null);
-  selectedDataset = signal<'Rainfall' | 'Temperature' | 'NDVI'>('Rainfall');
-  selectedTimescale = signal<number>(1); // 1..12
+
+  // Default can remain 'Rainfall'
+  // State
+  dataset = signal<Dataset>('Rainfall');         // one source of truth
+  selectedTimescale = signal<number>(6);         // default to 6 to match UI
+
+  // Helpers used by template
+  selectedDataset() { return this.dataset(); }   // so {{ selectedDataset() }} works
+  setTimescale(m: number) {                      // used by the chips
+    this.selectedTimescale.set(m);
+    this.loadSPIData(m);
+  }
+
+  // Actions used by the chips
+  pickDataset(d: Dataset) { this.dataset.set(d); }
+
   viewMode = signal<'islands' | 'divisions'>('islands');
 
   unit = computed(() => this.selectedDataset() === 'Rainfall' ? 'in' : '°F');
@@ -164,32 +179,15 @@ export class ClimateDashboardComponent {
 
 
   ngOnInit() {
-    
     this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
-      const projection = geoIdentity()
-        .reflectY(true)         // flip Y so north is up
-        .fitSize([560, 320], fc);
-
+      const projection = geoIdentity().reflectY(true).fitSize([560, 320], fc);
       const path = geoPath(projection as any);
 
       const features = fc.features.map((f: any) => {
-        const name = f.properties?.isle 
-                   || f.properties?.island 
-                   || f.properties?.name 
-                   || 'Unknown';
-
+        const name = f.properties?.isle || f.properties?.island || f.properties?.name || 'Unknown';
         const id = name.toLowerCase().replace(/\s+/g, '-');
-        return <Island>{
-          id,
-          name,
-          short: name,
-          divisions: DIVISIONS[name] || [],
-          feature: f,
-          key: id
-        };
-        this.http.get<any>('hawaii_islands_divisions.geojson').subscribe(fc => this.allDivisions = fc);
+        return <Island>{ id, name, short: name, divisions: DIVISIONS[name] || [], feature: f, key: id };
       });
-
 
       const pathById: Record<string, string> = {};
       const centroidById: Record<string, [number, number]> = {};
@@ -203,9 +201,12 @@ export class ClimateDashboardComponent {
       this.centroidById.set(centroidById);
     });
 
-    this.loadSPIData(1);
+    // Load scoped divisions metadata (if you need it later)
+    this.http.get<any>('hawaii_islands_divisions.geojson').subscribe(fc => this.allDivisions = fc);
 
+    this.loadSPIData(this.selectedTimescale()); // start with 6 if you chose 6 above
   }
+
 
   private loadSPIData(scale: number) {
     // Island-level (always)
@@ -303,13 +304,11 @@ export class ClimateDashboardComponent {
   }
 
 
-  timeRangeLabel(value: number): string {
-    switch (value) {
-      case 1: return 'Short Term';
-      case 6: return 'Medium Term';
-      case 12: return 'Long Term';
-      default: return `${value}-month`; // fallback
-    }
+  timeRangeLabel(ts: number): string {
+    if (ts === 1) return 'Last month';
+    if (ts === 6) return 'Last 6 months';
+    if (ts === 12) return 'Last year';
+    return `${ts}-month`;
   }
 
   tsData = signal<{ month: string; value: number }[]>([]);
@@ -414,7 +413,10 @@ export class ClimateDashboardComponent {
       });
     }
 
-    // ...keep your SPI averaging code below unchanged
+    const islandData = this.islandSPI
+      .filter((r: any) => r.island.toLowerCase() === isle.name.toLowerCase())
+      .map((r: any) => ({ month: r.month, value: r.value }));
+    this.tsData.set(islandData);
   }
 
 
@@ -472,16 +474,6 @@ export class ClimateDashboardComponent {
 
 
 
-
-
-  pickDataset(ds: 'Rainfall' | 'Temperature') { this.selectedDataset.set(ds); }
-  setTimescale(m: number) {
-    this.selectedTimescale.set(m);
-    this.loadSPIData(m);
-  }
-
-
-
   email = signal<string>('');
 
   private emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -492,6 +484,14 @@ export class ClimateDashboardComponent {
   subscribe() {
     if (!this.isEmailValid()) return;
     const label = this.selectedDivision() || this.selectedIsland()?.short || 'Statewide';
-    alert(`Subscribed ${this.email} to monthly ${this.selectedDataset()} updates for ${label} at ${this.selectedTimescale()}-month scale.`);
+    alert(`Subscribed ${this.email()} to monthly ${this.selectedDataset()} updates for ${label} at ${this.selectedTimescale()}-month scale.`);
   }
+
+  chartFullscreen = signal(false);
+
+  toggleChartFullscreen() {
+    this.chartFullscreen.set(!this.chartFullscreen());
+  }
+
+
 }
