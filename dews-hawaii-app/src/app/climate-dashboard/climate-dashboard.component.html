@@ -203,39 +203,56 @@
               </pattern>
             </defs>
             <rect x="0" y="0" width="560" height="320" fill="url(#grid)" />
+            <image
+              *ngIf="rasterHref() && rasterRect() && selectedDataset() === 'Rainfall'"
+              [attr.href]="rasterHref()"
+              [attr.x]="rasterRect()!.x"
+              [attr.y]="rasterRect()!.y"
+              [attr.width]="rasterRect()!.width"
+              [attr.height]="rasterRect()!.height"
+              preserveAspectRatio="none"
+              style="pointer-events:none"
+              opacity="0.9"
+            />
 
             <!-- Draw all island/division polygons first -->
             <g class="features">
               <path
                 *ngFor="let feature of islands(); trackBy: trackByIsle"
                 [attr.d]="pathById()[feature.id]"
+
                 [attr.fill]="
-                  viewMode() === 'divisions' && selectedDivision() === feature.key
-                    ? 'var(--primary)'
-                    : hoveredFeature() === feature.name
-                      ? '#cbd5e1'
-                      : '#e5e7eb'
+                  selectedDataset() === 'Rainfall'
+                    ? (hoveredFeature() === feature.name ? '#ffffff' : 'transparent')
+                    : (viewMode() === 'divisions' && selectedDivision() === feature.key
+                        ? 'var(--primary)'
+                        : (hoveredFeature() === feature.name ? '#cbd5e1' : '#e5e7eb'))
                 "
+                [attr.fill-opacity]="
+                  selectedDataset() === 'Rainfall'
+                    ? (hoveredFeature() === feature.name ? 0.35 : 0.001)   
+                    : 1
+                "
+
+                [attr.pointer-events]="'all'"
+
                 [attr.stroke]="
-                  viewMode() === 'divisions' && selectedDivision() === feature.key
+                  (viewMode() === 'divisions' && selectedDivision() === feature.key)
                     ? 'var(--ring)'
-                    : hoveredFeature() === feature.name
-                      ? '#6b7280'
-                      : '#9ca3af'
+                    : (hoveredFeature() === feature.name ? '#6b7280' : '#9ca3af')
                 "
                 [attr.stroke-width]="
-                  viewMode() === 'divisions' && selectedDivision() === feature.key ? 2
-                  : hoveredFeature() === feature.name ? 2
-                  : 1
+                  ((viewMode() === 'divisions' && selectedDivision() === feature.key) ||
+                   hoveredFeature() === feature.name) ? 2 : 1
                 "
+
                 (click)="viewMode() === 'islands' ? pickIsland(feature) : pickDivision(feature.key)"
                 (mouseenter)="hoveredFeature.set(feature.name)"
                 (mouseleave)="hoveredFeature.set(null)"
                 (mousemove)="onHover(feature, $event)"
               ></path>
-
-
             </g>
+
 
             <!-- Draw all labels on top -->
             <g class="labels">
