@@ -1,18 +1,32 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { geoIdentity, geoPath } from 'd3-geo';
-import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
+import type { FeatureCollection } from 'geojson';
 import * as d3 from 'd3';
-
 
 import { StatBoxComponent } from '../stat-box/stat-box.component';
 import { SpiChartComponent } from '../spi-chart/spi-chart.component';
 
-type Scope = 'divisions' | 'moku' | 'ahupuaa';
+import * as GeoTIFF from 'geotiff';
+import { Pool } from 'geotiff';
+import { interpolateViridis } from 'd3-scale-chromatic';
 
-// Island → County (only need what we use)
+type Scope = 'divisions' | 'moku' | 'ahupuaa';
+type Dataset = 'Rainfall' | 'Temperature' | 'SPI';
+
+interface Island {
+  id: string;
+  name: string;
+  short: string;
+  divisions: string[];
+  feature: any;
+  key: string;
+  island?: string;
+}
+
+// Island → County (only what we need)
 const COUNTY_BY_ISLAND: Record<string, string> = {
   'Kauaʻi': 'Kauaʻi',
   'Oʻahu': 'Honolulu',
@@ -31,27 +45,6 @@ const COUNTY_GROUPS: Record<string, string[]> = {
   'Hawaiʻi': ['Hawaiʻi']
 };
 
-function getCountyForIsland(islandName: string): string {
-  return COUNTY_BY_ISLAND[islandName] ?? islandName;
-}
-
-function getIslandsInSameCounty(islandName: string): string[] {
-  const c = getCountyForIsland(islandName);
-  return COUNTY_GROUPS[c] ?? [islandName];
-}
-type Dataset = 'Rainfall' | 'Temperature' | 'SPI';
-
-interface Island {
-  id: string;
-  name: string;
-  short: string;
-  divisions: string[];
-  feature: any;
-  key: string;        // <-- required now
-  island?: string;
-}
-
-
 const DIVISIONS: Record<string, string[]> = {
   'Kauaʻi': ['North Kauaʻi', 'South Kauaʻi'],
   'Oʻahu': ['Windward Oʻahu', 'Leeward Oʻahu', 'Honolulu'],
@@ -62,42 +55,34 @@ const DIVISIONS: Record<string, string[]> = {
   'Hawaiʻi': ['Hawaiʻi Mauka', 'Windward Kohala', 'Kaʻu', 'Hilo', 'Leeward Kohala', 'Kona'],
 };
 
-  function canonIsland(name: string): string {
-    if (!name) return '';
-    return name
-      .normalize('NFD')                 // split diacritics
-      .replace(/\p{Diacritic}/gu, '')   // strip macrons
-      .replace(/['’ʻ`]/g, '')           // strip okina/apostrophes
-      .toLowerCase()
-      .trim();
-  }
+function getCountyForIsland(islandName: string): string {
+  return COUNTY_BY_ISLAND[islandName] ?? islandName;
+}
+function getIslandsInSameCounty(islandName: string): string[] {
+  const c = getCountyForIsland(islandName);
+  return COUNTY_GROUPS[c] ?? [islandName];
+}
+function canonIsland(name: string): string {
+  if (!name) return '';
+  return name
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/['’ʻ`]/g, '')
+    .toLowerCase()
+    .trim();
+}
 
-  const CANON_TO_DISPLAY: Record<string, string> = {
-    kauai: 'Kauaʻi',
-    niihau: 'Niʻihau',
-    oahu: 'Oʻahu',
-    molokai: 'Molokaʻi',
-    lanai: 'Lānaʻi',
-    maui: 'Maui',
-    kahoolawe: 'Kahoʻolawe',
-    hawaii: 'Hawaiʻi',
-  };
-  function prettyIsland(canon?: string) {
-    return canon ? (CANON_TO_DISPLAY[canon] ?? canon) : '';
-  }
-
-
-
-  @Component({
-    selector: 'app-climate-dashboard',
-    standalone: true,
-    imports: [CommonModule, FormsModule, HttpClientModule, StatBoxComponent, SpiChartComponent],
-    templateUrl: './climate-dashboard.component.html',
-    styleUrls: ['./climate-dashboard.component.css']
-  })
-
-export class ClimateDashboardComponent {
+@Component({
+  selector: 'app-climate-dashboard',
+  standalone: true,
+  imports: [CommonModule, FormsModule, HttpClientModule, StatBoxComponent, SpiChartComponent],
+  templateUrl: './climate-dashboard.component.html',
+  styleUrls: ['./climate-dashboard.component.css']
+})
+export class ClimateDashboardComponent implements OnDestroy {
   constructor(private http: HttpClient) {}
+
+  // ===== Map data/state =====
   islands = signal<Island[]>([]);
   pathById = signal<Record<string, string>>({});
   centroidById = signal<Record<string, [number, number]>>({});
@@ -106,82 +91,215 @@ export class ClimateDashboardComponent {
   hoveredFeature = signal<string | null>(null);
   hoveredLabel = signal<{ name: string; x: number; y: number } | null>(null);
 
-  // State
   selectedIsland = signal<Island | null>(null);
   selectedDivision = signal<string | null>(null);
-
-  // Default can remain 'Rainfall'
-  // State
-  dataset = signal<Dataset>('Rainfall');         // one source of truth
-  selectedTimescale = signal<number>(6);         // default to 6 to match UI
-
-  // Helpers used by template
-  selectedDataset() { return this.dataset(); }   // so {{ selectedDataset() }} works
-  setTimescale(m: number) {                      // used by the chips
-    this.selectedTimescale.set(m);
-    this.loadSPIData(m);
-  }
-
-  // Actions used by the chips
-  pickDataset(d: Dataset) { this.dataset.set(d); }
-
   viewMode = signal<'islands' | 'divisions'>('islands');
 
+  // ===== Dataset/time =====
+  dataset = signal<Dataset>('Rainfall');
+  selectedTimescale = signal<number>(6);
+  selectedDataset() { return this.dataset(); }
+  pickDataset(d: Dataset) {
+    this.dataset.set(d);
+    // Lazy-load raster only when Rainfall is selected
+    if (d === 'Rainfall' && !this.rasterHref()) {
+      this.loadRasterOnce();
+    }
+  }
+  setTimescale(m: number) { this.selectedTimescale.set(m); this.loadSPIData(m); }
   unit = computed(() => this.selectedDataset() === 'Rainfall' ? 'in' : '°F');
+
+  // ===== SPI data buckets =====
   allDivisions: any;
   statewideSPI: any[] = [];
   islandSPI: any[] = [];
   divisionSPI: any[] = [];
 
+  // ===== Scope selection =====
+  selectedScope = signal<Scope | null>(null);
+  setScope(scope: Scope | null) {
+    this.selectedScope.set(scope);
+    if (this.selectedIsland()) this.pickIsland(this.selectedIsland()!); // rerender with new scope
+  }
   selectedDivisionName = computed(() => {
     const sel = this.selectedDivision();
     if (!sel) return null;
-    // handle either "island::Name" or just "Name"
     const parts = sel.split('::');
     return parts.length === 2 ? parts[1] : sel;
   });
 
-  private islandStubForCounty(county: string): Island | null {
-    const members = COUNTY_GROUPS[county];
-    if (!members || !members.length) return null;
-    const name = members[0]; // use the first island in that county group
-    const id = name.toLowerCase().replace(/\s+/g, '-');
-    return {
-      id,
-      name,
-      short: name,
-      divisions: DIVISIONS[name] || [],
-      feature: null,     // not needed for county flow; pickIsland refits with GeoJSON
-      key: id,
-    };
-  }
-
-  // Public handler for the chips
-  pickCounty(county: string) {
-    const stub = this.islandStubForCounty(county);
-    if (stub) this.pickIsland(stub);
-  }
-  
+  // ===== County helpers (UI chips) =====
   selectedCounty = computed(() => {
     const isle = this.selectedIsland();
     return isle ? getCountyForIsland(isle.name) : null;
   });
-
-  
   countyLabel = computed(() => {
     const isle = this.selectedIsland();
     if (!isle) return null;
     const county = getCountyForIsland(isle.name);
     const members = getIslandsInSameCounty(isle.name);
-    // Only show "County" if it’s a multi-island county
     return members.length > 1 ? `${county} County` : isle.short;
   });
+  private islandStubForCounty(county: string): Island | null {
+    const members = COUNTY_GROUPS[county];
+    if (!members || !members.length) return null;
+    const name = members[0];
+    const id = name.toLowerCase().replace(/\s+/g, '-');
+    return { id, name, short: name, divisions: DIVISIONS[name] || [], feature: null, key: id };
+  }
+  pickCounty(county: string) {
+    const stub = this.islandStubForCounty(county);
+    if (stub) this.pickIsland(stub);
+  }
 
+  // ===== Chart data (sidebar) =====
+  tsData = signal<{ month: string; value: number }[]>([]);
+  timeRangeLabel(ts: number): string {
+    if (ts === 1) return 'Last month';
+    if (ts === 6) return 'Last 6 months';
+    if (ts === 12) return 'Last year';
+    return `${ts}-month`;
+  }
 
-  ngOnInit() {
+  // ===== Email form =====
+  email = signal<string>('');
+  private emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  isEmailValid = computed(() => this.emailRegex.test(this.email().trim()));
+  subscribe() {
+    if (!this.isEmailValid()) return;
+    const label = this.selectedDivision() || this.selectedIsland()?.short || 'Statewide';
+    alert(`Subscribed ${this.email()} to monthly ${this.selectedDataset()} updates for ${label} at ${this.selectedTimescale()}-month scale.`);
+  }
+
+  chartFullscreen = signal(false);
+  toggleChartFullscreen() { this.chartFullscreen.set(!this.chartFullscreen()); }
+
+  // ===== Raster (GeoTIFF) =====
+  rasterHref = signal<string | null>(null); // Object URL to a PNG/WEBP
+  rasterRect = signal<{ x: number; y: number; width: number; height: number } | null>(null);
+  private rasterBBox: [number, number, number, number] | null = null; // [minX, minY, maxX, maxY]
+  private project: ((p: [number, number]) => [number, number]) | null = null;
+
+  private tiffPool = new Pool(Math.min(4, (navigator.hardwareConcurrency || 4))); // worker pool
+  private rasterScaleFactor = 1.5; // 1 = fastest; 1.5–2 = sharper
+  private objectUrl: string | null = null; // for cleanup
+
+  // Project bbox → SVG coords; computes <image> x/y/width/height
+  private updateRasterRect() {
+    if (!this.project || !this.rasterBBox) return;
+    const [minX, minY, maxX, maxY] = this.rasterBBox;
+    const pTL = this.project([minX, maxY]); // top-left
+    const pBR = this.project([maxX, minY]); // bottom-right
+    const x = Math.min(pTL[0], pBR[0]);
+    const y = Math.min(pTL[1], pBR[1]);
+    const width = Math.abs(pBR[0] - pTL[0]);
+    const height = Math.abs(pBR[1] - pTL[1]);
+    this.rasterRect.set({ x, y, width, height });
+  }
+
+  // Read & colorize TIFF once; reuse bitmap as projection changes
+  private async loadRasterOnce() {
+    try {
+      const tiff = await GeoTIFF.fromUrl('rainfall_2025_08.tif');
+      const image = await tiff.getImage();
+
+      // Geo bbox [minX, minY, maxX, maxY]
+      this.rasterBBox = image.getBoundingBox() as [number, number, number, number];
+
+      // Downsample target resolution based on SVG (560×320)
+      const baseW = 560;
+      const targetW = Math.round(baseW * this.rasterScaleFactor);
+      const srcW = image.getWidth();
+      const srcH = image.getHeight();
+      const targetH = Math.max(1, Math.round(targetW * (srcH / srcW)));
+
+      // Read first band with worker pool
+      const band = await image.readRasters({
+        samples: [0],
+        width: targetW,
+        height: targetH,
+        interleave: true,
+        resampleMethod: 'nearest',
+        pool: this.tiffPool
+      }) as Float32Array | Uint16Array | Uint8Array;
+
+      // Robust NoData
+      const nodata = this.getNoDataValue(image);
+      const isNoData = (v: number) =>
+        (nodata !== undefined && v === nodata) ||
+        !Number.isFinite(v) ||
+        Math.abs(v) > 1e20;
+
+      // Auto-stretch min/max ignoring NoData
+      let min = Number.POSITIVE_INFINITY, max = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i < band.length; i++) {
+        const v = Number(band[i]);
+        if (isNoData(v)) continue;
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      if (!Number.isFinite(min) || !Number.isFinite(max)) { min = 0; max = 1; }
+
+      // Viridis reversed for rainfall
+      const colorScale = d3.scaleSequential(interpolateViridis).domain([max, min]);
+
+      // Paint to canvas → Blob URL
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d')!;
+      const imgData = ctx.createImageData(targetW, targetH);
+
+      for (let i = 0; i < band.length; i++) {
+        const v = Number(band[i]);
+        const idx = i * 4;
+        if (isNoData(v)) { imgData.data[idx + 3] = 0; continue; }
+        const c = d3.rgb(colorScale(v));
+        imgData.data[idx + 0] = c.r;
+        imgData.data[idx + 1] = c.g;
+        imgData.data[idx + 2] = c.b;
+        imgData.data[idx + 3] = 220; // alpha
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      const blob: Blob = await new Promise(resolve => {
+        // Try webp; fall back to png if needed
+        canvas.toBlob(b => {
+          if (b) return resolve(b);
+          canvas.toBlob(b2 => resolve(b2 as Blob), 'image/png');
+        }, 'image/webp', 0.9);
+      });
+
+      // Cleanup previous URL if any
+      if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+      this.objectUrl = URL.createObjectURL(blob);
+      this.rasterHref.set(this.objectUrl);
+
+      // Position for current projection
+      this.updateRasterRect();
+    } catch (err) {
+      console.error('Failed to load rainfall_2025_08.tif', err);
+    }
+  }
+
+  private getNoDataValue(image: any): number | undefined {
+    const tag = image?.fileDirectory?.GDAL_NODATA ?? image?.getGDALNoData?.();
+    if (tag != null) {
+      const n = Number(tag);
+      return Number.isFinite(n) ? n : undefined;
+    }
+    return undefined;
+  }
+
+  // ===== Lifecycle =====
+  ngOnInit(): void {
+    // Base islands
     this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
       const projection = geoIdentity().reflectY(true).fitSize([560, 320], fc);
       const path = geoPath(projection as any);
+
+      // keep projection for raster placement
+      this.project = (projection as any);
 
       const features = fc.features.map((f: any) => {
         const name = f.properties?.isle || f.properties?.island || f.properties?.name || 'Unknown';
@@ -199,26 +317,56 @@ export class ClimateDashboardComponent {
       this.islands.set(features);
       this.pathById.set(pathById);
       this.centroidById.set(centroidById);
+
+      // initial raster placement; raster loads lazily when dataset === 'Rainfall'
+      this.updateRasterRect();
+      if (this.selectedDataset() === 'Rainfall') this.loadRasterOnce();
     });
 
-    // Load scoped divisions metadata (if you need it later)
+    // Divisions metadata (optional)
     this.http.get<any>('hawaii_islands_divisions.geojson').subscribe(fc => this.allDivisions = fc);
 
-    this.loadSPIData(this.selectedTimescale()); // start with 6 if you chose 6 above
+    // Initial SPI load (6-month default)
+    this.loadSPIData(this.selectedTimescale());
   }
 
+  ngOnDestroy(): void {
+    if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+    // Pool will auto-end with page lifecycle; no explicit destroy needed
+  }
+
+  // ===== Helpers =====
+  private getProp(o: any, keys: string[]) {
+    for (const k of keys) {
+      const v = o?.[k];
+      if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+    }
+    return null;
+  }
+
+  private parseCsv(csvData: string, labelKey: 'state' | 'island' | 'division' | 'moku' | 'ahupuaa') {
+    const rows = csvData.split('\n').map(r => r.split(','));
+    const headers = rows[0];
+    const data: any[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      if (!rows[i][0]) continue;
+      const label = rows[i][0].trim();
+      for (let j = 1; j < headers.length; j++) {
+        data.push({ [labelKey]: label, month: headers[j], value: +rows[i][j] });
+      }
+    }
+    return data;
+  }
 
   private loadSPIData(scale: number) {
     // Island-level (always)
     this.http.get(`island_spi${scale}.csv`, { responseType: 'text' })
       .subscribe(csv => {
         this.islandSPI = this.parseCsv(csv, 'island');
-        if (this.selectedIsland() && !this.selectedDivision()) {
-          this.pickIsland(this.selectedIsland()!);
-        }
+        if (this.selectedIsland() && !this.selectedDivision()) this.pickIsland(this.selectedIsland()!);
       });
 
-    // Scope-specific (only if a scope is selected)
+    // Scope-specific (if selected)
     const scope = this.selectedScope();
     if (scope) {
       let file = '';
@@ -233,7 +381,6 @@ export class ClimateDashboardComponent {
           if (this.selectedDivision()) this.pickDivision(this.selectedDivision()!);
         });
     } else {
-      // No scope selected → clear any prior scope data
       this.divisionSPI = [];
       this.selectedDivision.set(null);
     }
@@ -251,7 +398,6 @@ export class ClimateDashboardComponent {
       });
   }
 
-
   onHover(feature: any, event: MouseEvent) {
     if (this.selectedScope() === 'ahupuaa') {
       const svg = (event.target as SVGPathElement).ownerSVGElement!;
@@ -266,61 +412,6 @@ export class ClimateDashboardComponent {
     }
   }
 
-  
-
-  // Default: no scope selected
-  selectedScope = signal<Scope | null>(null);
-
-  setScope(scope: Scope | null) {
-    this.selectedScope.set(scope);
-
-    // If an island/county is already selected, re-render with new scope (or none)
-    if (this.selectedIsland()) {
-      this.pickIsland(this.selectedIsland()!);
-    }
-  }
-
-
-  private parseCsv(
-    csvData: string,
-    labelKey: 'state' | 'island' | 'division' | 'moku' | 'ahupuaa'
-  ) {
-    const rows = csvData.split('\n').map(r => r.split(','));
-    const headers = rows[0];
-    const data: any[] = [];
-
-    for (let i = 1; i < rows.length; i++) {
-      if (!rows[i][0]) continue;
-      const label = rows[i][0].trim();
-      for (let j = 1; j < headers.length; j++) {
-        data.push({
-          [labelKey]: label,
-          month: headers[j],
-          value: +rows[i][j]
-        });
-      }
-    }
-    return data;
-  }
-
-
-  timeRangeLabel(ts: number): string {
-    if (ts === 1) return 'Last month';
-    if (ts === 6) return 'Last 6 months';
-    if (ts === 12) return 'Last year';
-    return `${ts}-month`;
-  }
-
-  tsData = signal<{ month: string; value: number }[]>([]);
-  // Return the first non-empty property found
-  private getProp(o: any, keys: string[]) {
-    for (const k of keys) {
-      const v = o?.[k];
-      if (v !== undefined && v !== null && String(v).trim() !== '') return v;
-    }
-    return null;
-  }
-
   pickIsland(isle: Island) {
     this.selectedIsland.set(isle);
     this.selectedDivision.set(null);
@@ -329,9 +420,8 @@ export class ClimateDashboardComponent {
     const groupCanon = new Set(getIslandsInSameCounty(isle.name).map(canonIsland));
 
     if (!scope) {
-      // --- NO SCOPE: county = group of island outlines ---
+      // County outlines
       this.viewMode.set('islands');
-
       this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
         const fcCounty = {
           type: 'FeatureCollection',
@@ -343,6 +433,8 @@ export class ClimateDashboardComponent {
 
         const projection = geoIdentity().reflectY(true).fitSize([560, 320], fcCounty);
         const path = geoPath(projection as any);
+        this.project = (projection as any);
+        this.updateRasterRect();
 
         const features = fcCounty.features.map((f: any) => {
           const name = f.properties?.isle || f.properties?.island || f.properties?.name || 'Island';
@@ -360,9 +452,8 @@ export class ClimateDashboardComponent {
         this.pathById.set(pathById);
         this.centroidById.set(centroidById);
       });
-
     } else {
-      // --- SCOPE CHOSEN: render scoped polygons (divisions/moku/ahupuaʻa) ---
+      // Scoped polygons
       this.viewMode.set('divisions');
 
       const file = scope === 'moku'
@@ -384,6 +475,8 @@ export class ClimateDashboardComponent {
 
         const projection = geoIdentity().reflectY(true).fitSize([560, 320], fcCounty);
         const path = geoPath(projection as any);
+        this.project = (projection as any);
+        this.updateRasterRect();
 
         const features = fcCounty.features.map((f: any) => {
           const p = f.properties || {};
@@ -413,17 +506,15 @@ export class ClimateDashboardComponent {
       });
     }
 
+    // Update chart series with island SPI
     const islandData = this.islandSPI
       .filter((r: any) => r.island.toLowerCase() === isle.name.toLowerCase())
       .map((r: any) => ({ month: r.month, value: r.value }));
     this.tsData.set(islandData);
   }
 
-
-
   pickDivision(d: string) {
     this.selectedDivision.set(d);
-
     const scope = this.selectedScope();
     let key: 'division' | 'moku' | 'ahupuaa' = 'division';
     if (scope === 'moku') key = 'moku';
@@ -432,22 +523,19 @@ export class ClimateDashboardComponent {
     const data = this.divisionSPI
       .filter((r: any) => r[key] === d)
       .map((r: any) => ({ month: r.month, value: r.value }));
-
     this.tsData.set(data);
   }
-
 
   reset() {
     this.selectedIsland.set(null);
     this.selectedDivision.set(null);
-    this.viewMode.set('islands');  
+    this.viewMode.set('islands');
 
-    // reload map
     this.http.get<any>('hawaii_islands_simplified.geojson').subscribe(fc => {
-      const projection = geoIdentity()
-        .reflectY(true)
-        .fitSize([560, 320], fc);
+      const projection = geoIdentity().reflectY(true).fitSize([560, 320], fc);
       const path = geoPath(projection as any);
+      this.project = (projection as any);
+      this.updateRasterRect();
 
       const features = fc.features.map((f: any) => {
         const name = f.properties?.isle || 'Island';
@@ -466,32 +554,10 @@ export class ClimateDashboardComponent {
       this.pathById.set(pathById);
       this.centroidById.set(centroidById);
     });
+
     const stateData = this.statewideSPI
-      .filter(r => r.state.toLowerCase() === 'statewide')
-      .map(r => ({ month: r.month, value: r.value }));
+      .filter((r: any) => r.state.toLowerCase() === 'statewide')
+      .map((r: any) => ({ month: r.month, value: r.value }));
     this.tsData.set(stateData);
   }
-
-
-
-  email = signal<string>('');
-
-  private emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  isEmailValid = computed(() => this.emailRegex.test(this.email().trim()));
-
-
-  subscribe() {
-    if (!this.isEmailValid()) return;
-    const label = this.selectedDivision() || this.selectedIsland()?.short || 'Statewide';
-    alert(`Subscribed ${this.email()} to monthly ${this.selectedDataset()} updates for ${label} at ${this.selectedTimescale()}-month scale.`);
-  }
-
-  chartFullscreen = signal(false);
-
-  toggleChartFullscreen() {
-    this.chartFullscreen.set(!this.chartFullscreen());
-  }
-
-
 }
