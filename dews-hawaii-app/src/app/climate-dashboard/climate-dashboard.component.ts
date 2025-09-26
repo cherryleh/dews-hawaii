@@ -227,9 +227,9 @@ export class ClimateDashboardComponent implements OnDestroy {
   private async loadRasterOnce(dataset: Dataset) {
       try {
         let file = '';
-        if (dataset === 'Rainfall') file = '/tifs/rainfall_2025_08.tif';
-        else if (dataset === 'Temperature') file = '/tifs/tmean_2025_08.tif';
-        else if (dataset === 'Drought') file = '/tifs/spi1_2025_08.tif';
+        if (dataset === 'Rainfall') file = 'tifs/rainfall_2025_08.tif';
+        else if (dataset === 'Temperature') file = 'tifs/tmean_2025_08.tif';
+        else if (dataset === 'Drought') file = 'tifs/spi1_2025_08.tif';
 
         const tiff = await GeoTIFF.fromUrl(file);
         const image = await tiff.getImage();
