@@ -101,7 +101,6 @@ export class ClimateDashboardComponent implements OnDestroy {
 
   // ===== Dataset/time =====
   dataset = signal<Dataset>('Rainfall');
-  selectedTimescale = signal<number>(6);
   selectedDataset() { return this.dataset(); }
   pickDataset(d: Dataset) {
     this.dataset.set(d);
@@ -111,15 +110,6 @@ export class ClimateDashboardComponent implements OnDestroy {
   colorbarMin = 0;
   colorbarMax = 1;
   colorbarMid: number | null = null;
-
-
-  setTimescale(m: number) { this.selectedTimescale.set(m); this.loadSPIData(m); }
-  unit = computed(() => {
-    if (this.selectedDataset() === 'Rainfall') return 'in';
-    if (this.selectedDataset() === 'Temperature') return '°F';
-    if (this.selectedDataset() === 'Drought') return 'SPI';
-    return '';
-  });
 
 
   // ===== SPI data buckets =====
@@ -177,12 +167,6 @@ export class ClimateDashboardComponent implements OnDestroy {
 
   // ===== Chart data (sidebar) =====
   tsData = signal<{ month: string; value: number }[]>([]);
-  timeRangeLabel(ts: number): string {
-    if (ts === 1) return 'Last month';
-    if (ts === 6) return 'Last 6 months';
-    if (ts === 12) return 'Last 12 months';
-    return `${ts}-month`;
-  }
 
   // ===== Email form =====
   email = signal<string>('');
@@ -191,7 +175,7 @@ export class ClimateDashboardComponent implements OnDestroy {
   subscribe() {
     if (!this.isEmailValid()) return;
     const label = this.selectedDivision() || this.selectedIsland()?.short || 'Statewide';
-    alert(`Subscribed ${this.email()} to monthly ${this.selectedDataset()} updates for ${label} at ${this.selectedTimescale()}-month scale.`);
+    alert(`Subscribed ${this.email()} to monthly ${this.selectedDataset()} updates for ${label}.`);
   }
 
   chartFullscreen = signal(false);
@@ -389,7 +373,7 @@ export class ClimateDashboardComponent implements OnDestroy {
     this.http.get<any>('hawaii_islands_divisions.geojson').subscribe(fc => this.allDivisions = fc);
 
     // Initial SPI load (6-month default)
-    this.loadSPIData(this.selectedTimescale());
+    this.loadSPIData(6);
   }
 
   private drawColorbar(dataset: Dataset) {
@@ -498,6 +482,14 @@ export class ClimateDashboardComponent implements OnDestroy {
       }
     }
   }
+
+  unit = computed(() => {
+    if (this.selectedDataset() === 'Rainfall') return 'in';
+    if (this.selectedDataset() === 'Temperature') return '°F';
+    if (this.selectedDataset() === 'Drought') return 'SPI';
+    return '';
+  });
+
 
   pickIsland(isle: Island) {
     this.selectedIsland.set(isle);
