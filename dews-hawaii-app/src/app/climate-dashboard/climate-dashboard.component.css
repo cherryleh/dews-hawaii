@@ -269,3 +269,46 @@
   font-size: 15px;
   color: var(--sub);
 }
+
+.colorbar {
+  margin-top: 8px;
+  width: 240px;
+}
+.colorbar canvas {
+  display: block;
+  width: 240px;
+  height: 20px;
+  background: #eee; /* just for debug */
+}
+
+.colorbar .ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--sub);
+  margin-top: 2px;
+}
+
+.map {
+  position: relative;
+  overflow: hidden;
+}
+
+/* New legend styling */
+.colorbar.legend {
+  position: absolute;
+  bottom: 20px;   /* move up inside the SVG space */
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.9);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+.colorbar.legend canvas {
+  display: block;
+  margin: 0 auto;
+}

@@ -218,6 +218,7 @@
               
             </div>
           </div>
+          
           <svg viewBox="0 0 560 320" class="map-svg" role="img" aria-label="Hawaiʻi islands (abstract)">
             <defs>
               <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
@@ -316,6 +317,17 @@
 
 
           </svg>
+          <div class="colorbar legend" *ngIf="rasterHref()">
+            <canvas id="colorbarCanvas" width="240" height="20"></canvas>
+            <div class="ticks">
+              <span>{{ colorbarMin | number:'1.1-1' }} {{ unit() }}</span>
+              <span *ngIf="colorbarMid !== null">{{ colorbarMid | number:'1.1-1' }} {{ unit() }}</span>
+              <span>{{ colorbarMax | number:'1.1-1' }} {{ unit() }}</span>
+            </div>
+          </div>
+          <!-- Colorbar Legend -->
+
+
         </div>
       </section>
 

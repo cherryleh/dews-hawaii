@@ -5,6 +5,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { geoIdentity, geoPath } from 'd3-geo';
 import type { FeatureCollection } from 'geojson';
 import * as d3 from 'd3';
+import { take } from 'rxjs/operators';
 
 import { StatBoxComponent } from '../stat-box/stat-box.component';
 import { SpiChartComponent } from '../spi-chart/spi-chart.component';
@@ -12,7 +13,7 @@ import { SpiChartComponent } from '../spi-chart/spi-chart.component';
 import * as GeoTIFF from 'geotiff';
 import { Pool } from 'geotiff';
 import { interpolateViridis, interpolateRdBu } from 'd3-scale-chromatic';
-
+import { NgZone } from '@angular/core';
 
 type Scope = 'divisions' | 'moku' | 'ahupuaa';
 type Dataset = 'Rainfall' | 'Temperature' | 'Drought';
@@ -73,7 +74,6 @@ function canonIsland(name: string): string {
     .trim();
 }
 
-let colorScale: d3.ScaleSequential<string> | d3.ScaleDiverging<string>;
 
 
 @Component({
@@ -84,7 +84,7 @@ let colorScale: d3.ScaleSequential<string> | d3.ScaleDiverging<string>;
   styleUrls: ['./climate-dashboard.component.css']
 })
 export class ClimateDashboardComponent implements OnDestroy {
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private ngZone: NgZone) {}
 
   // ===== Map data/state =====
   islands = signal<Island[]>([]);
@@ -108,8 +108,19 @@ export class ClimateDashboardComponent implements OnDestroy {
     this.loadRasterOnce(d);
   }
 
+  colorbarMin = 0;
+  colorbarMax = 1;
+  colorbarMid: number | null = null;
+
+
   setTimescale(m: number) { this.selectedTimescale.set(m); this.loadSPIData(m); }
-  unit = computed(() => this.selectedDataset() === 'Rainfall' ? 'in' : '°F');
+  unit = computed(() => {
+    if (this.selectedDataset() === 'Rainfall') return 'in';
+    if (this.selectedDataset() === 'Temperature') return '°F';
+    if (this.selectedDataset() === 'Drought') return 'SPI';
+    return '';
+  });
+
 
   // ===== SPI data buckets =====
   allDivisions: any;
@@ -209,6 +220,9 @@ export class ClimateDashboardComponent implements OnDestroy {
     this.rasterRect.set({ x, y, width, height });
   }
 
+  private colorScale: d3.ScaleSequential<string> | d3.ScaleDiverging<string> | null = null;
+
+
   // Read & colorize TIFF once; reuse bitmap as projection changes
   private async loadRasterOnce(dataset: Dataset) {
       try {
@@ -263,17 +277,17 @@ export class ClimateDashboardComponent implements OnDestroy {
 
       if (dataset === 'Rainfall') {
         // Viridis reversed (high = dark purple, low = yellow)
-        colorScale = d3.scaleSequential(interpolateViridis).domain([max, min]);
+        this.colorScale = d3.scaleSequential(interpolateViridis).domain([max, min]);
       } else if (dataset === 'Temperature') {
         // Regular Viridis (low = purple, high = yellow)
-        colorScale = d3.scaleSequential(interpolateViridis).domain([min, max]);
+        this.colorScale = d3.scaleSequential(interpolateViridis).domain([min, max]);
       } else if (dataset === 'Drought') {
         // Blue → White → Red, centered at 0
         const absMax = Math.max(Math.abs(min), Math.abs(max));
-        colorScale = d3.scaleDiverging(interpolateRdBu).domain([-absMax, 0, absMax]);
+        this.colorScale = d3.scaleDiverging(interpolateRdBu).domain([-absMax, 0, absMax]);
       } else {
         // Fallback
-        colorScale = d3.scaleSequential(interpolateViridis).domain([min, max]);
+        this.colorScale = d3.scaleSequential(interpolateViridis).domain([min, max]);
       }
 
       // Paint to canvas → Blob URL
@@ -287,7 +301,7 @@ export class ClimateDashboardComponent implements OnDestroy {
         const v = Number(band[i]);
         const idx = i * 4;
         if (isNoData(v)) { imgData.data[idx + 3] = 0; continue; }
-        const c = d3.rgb(colorScale(v));
+        const c = d3.rgb(this.colorScale(v));
         imgData.data[idx + 0] = c.r;
         imgData.data[idx + 1] = c.g;
         imgData.data[idx + 2] = c.b;
@@ -303,6 +317,12 @@ export class ClimateDashboardComponent implements OnDestroy {
         }, 'image/webp', 0.9);
       });
 
+      this.colorbarMin = min;
+      this.colorbarMax = max;
+      this.colorbarMid = dataset === 'Drought' ? 0 : (min + max) / 2;
+      this.drawColorbar(dataset);
+
+
       // Cleanup previous URL if any
       if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
       this.objectUrl = URL.createObjectURL(blob);
@@ -311,6 +331,10 @@ export class ClimateDashboardComponent implements OnDestroy {
     } catch (err) {
       console.error(`Failed to load raster for ${dataset}`, err);
     }
+
+    this.drawColorbar(dataset);
+
+
   }
 
   private getNoDataValue(image: any): number | undefined {
@@ -367,6 +391,31 @@ export class ClimateDashboardComponent implements OnDestroy {
     // Initial SPI load (6-month default)
     this.loadSPIData(this.selectedTimescale());
   }
+
+  private drawColorbar(dataset: Dataset) {
+    requestAnimationFrame(() => {
+      const canvas = document.getElementById('colorbarCanvas') as HTMLCanvasElement | null;
+      if (!canvas || !this.colorScale) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const w = canvas.width;
+      const h = canvas.height;
+
+      const grad = ctx.createLinearGradient(0, 0, w, 0);
+      const steps = 50;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const val = this.colorbarMin + t * (this.colorbarMax - this.colorbarMin);
+        grad.addColorStop(t, this.colorScale(val));
+      }
+
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+    });
+  }
+
 
   ngOnDestroy(): void {
     if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
