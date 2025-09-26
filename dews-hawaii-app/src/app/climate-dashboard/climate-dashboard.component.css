@@ -74,8 +74,31 @@
 .chips { display:flex; flex-wrap:wrap; gap:8px; }
 
 /* Stats grid */
-.stats { display:grid; grid-template-columns: 1fr; gap:12px; margin-top:12px; }
-@media (min-width:640px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (min-width: 640px) {
+  /* Rainfall & Temperature: 4-up */
+  .stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Drought: 3-up */
+  .stats-drought {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.stats-drought {
+  display: grid;
+  grid-template-columns: repeat(3, auto); /* let boxes size naturally */
+  gap: 12px;
+  justify-content: center; /* center the whole grid row */
+}
+
 
 /* Slider */
 .slider-wrap { position:relative; padding-top:20px; }

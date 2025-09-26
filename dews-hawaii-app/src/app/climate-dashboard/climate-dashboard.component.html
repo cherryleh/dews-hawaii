@@ -46,51 +46,26 @@
         </div>
 
         <!-- Tiles -->
-        <div *ngIf="selectedDataset() === 'Rainfall'; else tempOrSpi" class="stats stats-rainfall">
-          <app-stat-box label="RF" value="2.0 in"></app-stat-box>
+        <div class="stats" *ngIf="selectedDataset() === 'Rainfall'">
+          <app-stat-box label="Value" value="2.0 in"></app-stat-box>
           <app-stat-box label="Anomaly" value="-3.2 in"></app-stat-box>
+          <app-stat-box label="Rank" value="Driest" note="out of 35 years"></app-stat-box>
+          <app-stat-box label="Drought" value="Exceptionally Dry"></app-stat-box>
         </div>
 
-        <ng-template #tempOrSpi>
-          <div class="stats">
-            <!-- Rank adapts -->
-            <ng-container [ngSwitch]="selectedDataset()">
-              <app-stat-box
-                *ngSwitchCase="'Rainfall'"
-                label="Rank"
-                value="Driest"
-                note="out of 35 years">
-              </app-stat-box>
+        <!-- Temperature -->
+        <div class="stats" *ngIf="selectedDataset() === 'Temperature'">
+          <app-stat-box label="Value" value="78 °F"></app-stat-box>
+          <app-stat-box label="Anomaly" value="+1.5 °F"></app-stat-box>
+          <app-stat-box label="Rank" value="Warmest" note="out of 35 years"></app-stat-box>
+          <app-stat-box label="Drought" value="Moderate"></app-stat-box>
+        </div>
 
-              <app-stat-box
-                *ngSwitchCase="'Temperature'"
-                label="Rank"
-                value="Warmest"
-                note="out of 35 years">
-              </app-stat-box>
-
-              <app-stat-box
-                *ngSwitchDefault
-                label="Rank"
-                value="—"
-                note="not available">
-              </app-stat-box>
-            </ng-container>
-
-            <!-- SPI only for rainfall/drought -->
-            <app-stat-box
-              *ngIf="selectedDataset() === 'Rainfall' || selectedDataset() === 'Drought'"
-              label="SPI"
-              value="Exceptionally Dry">
-            </app-stat-box>
-          </div>
-
-        </ng-template>
-
-        <!-- Shared row: Rank | SPI -->
-        <div class="stats">
-          <app-stat-box label="Rank" value="Driest" note="out of 35 years"></app-stat-box>
-          <app-stat-box label="SPI" value="Exceptionally Dry"></app-stat-box>
+        <!-- Drought -->
+        <div class="stats stats-drought" *ngIf="selectedDataset() === 'Drought'">
+          <app-stat-box label="Short-term" value="Moderate Drought"></app-stat-box>
+          <app-stat-box label="Medium-term" value="Severe Drought"></app-stat-box>
+          <app-stat-box label="Long-term" value="Extreme Drought"></app-stat-box>
         </div>
       </section>
 
